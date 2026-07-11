@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -16,8 +17,8 @@ from mogil_bench.artifacts import (
 )
 from mogil_bench.cli import app
 from mogil_bench.models import Pack, PrivacyClass
-from mogil_bench.packs import PackError, load_pack
-from mogil_bench.runner import MAX_OUTPUT_BYTES, run_pack
+from mogil_bench.packs import PackError, load_pack, pack_fingerprint
+from mogil_bench.runner import MAX_OUTPUT_BYTES, logical_run_id, run_pack
 
 ROOT = Path(__file__).parents[1]
 CLI = CliRunner()
@@ -126,6 +127,43 @@ def test_pack_rejects_fixture_escape(tmp_path: Path) -> None:
         load_pack(write_pack(tmp_path, data))
 
 
+@pytest.mark.parametrize(
+    ("pack_name", "fingerprint", "record_ids"),
+    [
+        (
+            "sample-v1.yaml",
+            "4fc1f75fb925563bafb9c74ebdc83987ea432c2216a56fc18f2b61fb90b8e35f",
+            [
+                "mogil-a5a4b03850226fc9c164c4652ba1bf074fb13421e2b88dbe7986e7450eb62739",
+                "mogil-03e33f2bcd1a92a8e20db9165990880aa43ca9a03fa3f1fe2ed00e33eee2bdac",
+            ],
+        ),
+        (
+            "command-smoke-v1.yaml",
+            "ff368c1e58930b8d0df951c78e3097a794a0f0a8c5072d2200d638bdbd3b896f",
+            ["mogil-8a5d813eadf669ea9e071e46fc705f5c09df3e5b0634625ee678b8331898bfbf"],
+        ),
+        (
+            "pi-template-v1.yaml",
+            "c5dbfdc8cc3cd5436392113db9d374b641ee502eaf5ff461586fdb53bc020834",
+            ["mogil-879967530150e8c7ef02e9602947ffb91bd89343542c99f3d9721b497c4608db"],
+        ),
+    ],
+)
+def test_legacy_identity_projection_preserves_exact_origin_main_values(
+    pack_name: str, fingerprint: str, record_ids: list[str]
+) -> None:
+    pack_path = ROOT / "packs" / pack_name
+    pack = load_pack(pack_path)
+
+    assert pack_fingerprint(pack_path, pack) == fingerprint
+    assert [
+        logical_run_id(fingerprint, task, config)
+        for task in pack.tasks
+        for config in pack.configurations
+    ] == record_ids
+
+
 def test_mock_is_deterministic_and_ids_are_stable(tmp_path: Path) -> None:
     first = run_pack(ROOT / "packs/sample-v1.yaml", tmp_path / "one")
     second = run_pack(ROOT / "packs/sample-v1.yaml", tmp_path / "two")
@@ -136,6 +174,39 @@ def test_mock_is_deterministic_and_ids_are_stable(tmp_path: Path) -> None:
         item["execution"]["content"]
         for item in second_raw  # type: ignore[index]
     ]
+
+
+def test_output_publication_is_atomic_on_success_failure_cancellation_and_rerun(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "run"
+    run_pack(ROOT / "packs/sample-v1.yaml", output)
+    assert output.is_dir() and not list(tmp_path.glob(".run.staging-*"))
+    with pytest.raises(FileExistsError):
+        run_pack(ROOT / "packs/sample-v1.yaml", output)
+
+    def failed_export(_path: Path) -> tuple[Path, Path]:
+        raise RuntimeError("export failed")
+
+    monkeypatch.setattr("mogil_bench.artifacts.export_run", failed_export)
+    failed = tmp_path / "failed"
+    with pytest.raises(RuntimeError, match="export failed"):
+        run_pack(ROOT / "packs/sample-v1.yaml", failed)
+    assert not failed.exists() and not list(tmp_path.glob(".failed.staging-*"))
+
+    cancelled = tmp_path / "cancelled"
+
+    def cancel_agent(*_args: object) -> object:
+        raise asyncio.CancelledError
+
+    with pytest.raises(asyncio.CancelledError):
+        run_pack(
+            ROOT / "packs/pi-template-v1.yaml",
+            cancelled,
+            allow_agents=True,
+            host_pi=cancel_agent,  # type: ignore[arg-type]
+        )
+    assert not cancelled.exists() and not list(tmp_path.glob(".cancelled.staging-*"))
 
 
 def test_command_requires_cli_acknowledgement(tmp_path: Path) -> None:

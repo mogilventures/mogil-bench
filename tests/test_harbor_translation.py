@@ -77,8 +77,9 @@ def test_translation_builds_harbor_1_3_task_and_pinned_job(tmp_path: Path) -> No
         "environment/Dockerfile",
         "environment/workspace/calculator.py",
         "environment/source-manifest.json",
-        "environment/capture_workspace.py",
         "tests/Dockerfile",
+        "tests/baseline/calculator.py",
+        "tests/capture_workspace.py",
         "tests/test.sh",
         "tests/verify.py",
         "tests/hidden_verify.py",
@@ -95,9 +96,13 @@ def test_translation_builds_harbor_1_3_task_and_pinned_job(tmp_path: Path) -> No
     assert parsed.environment.cpus == 1
     assert parsed.environment.memory_mb == 2048
     assert parsed.environment.storage_mb == 4096
-    assert len(parsed.verifier.collect) == 1
-    assert parsed.verifier.collect[0].service == "main"
-    assert "/logs/artifacts/workspace" in parsed.verifier.collect[0].command
+    assert parsed.verifier.collect == []
+    environment_dockerfile = (translation.task_dir / "environment/Dockerfile").read_text()
+    assert "/mogil/before-workspace" not in environment_dockerfile
+    assert "capture_workspace.py" not in environment_dockerfile
+    tests_dockerfile = (translation.task_dir / "tests/Dockerfile").read_text()
+    assert "baseline/ /mogil/before-workspace/" in tests_dockerfile
+    assert "capture_workspace.py /mogil/capture_workspace.py" in tests_dockerfile
 
     harbor_job = HarborJobConfig(
         **translation.job_config,

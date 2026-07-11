@@ -10,6 +10,9 @@ from .harbor_backend import PI_VERSION
 from .models import AttemptIdentity, Configuration, Task
 from .packs import resolve_fixture
 
+PYTHON_BASE_IMAGE = (
+    "python:3.12-slim@sha256:423ed6ab25b1921a477529254bfeeabf5855151dc2c3141699a1bfc852199fbf"
+)
 AGENT_CPUS = 1
 AGENT_MEMORY_MB = 2048
 AGENT_STORAGE_MB = 4096
@@ -50,7 +53,7 @@ def _copy_candidate_fixture(source: Path, destination: Path) -> list[dict[str, s
     return manifest
 
 
-def _verifier_wrapper(task: Task) -> str:
+def _verifier_wrapper(task: Task, *, trusted_workspace_evidence: bool = True) -> str:
     if task.verifier is None:
         raise ValueError("Harbor coding tasks require a verifier")
     verifier = task.verifier
@@ -59,6 +62,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import time
 
@@ -100,6 +104,25 @@ exit_ok = (
 )
 stdout_ok = expected_stdout is None or expected_stdout in stdout
 passed = exit_ok and stdout_ok
+try:
+    if {trusted_workspace_evidence!r}:
+        trusted_evidence = logs / "workspace"
+        shutil.rmtree(trusted_evidence, ignore_errors=True)
+        evidence = subprocess.run(
+            ["/usr/local/bin/python", "/mogil/capture_workspace.py",
+             "/mogil/before-workspace", "/workspace", str(trusted_evidence)],
+            capture_output=True,
+            check=False,
+            timeout={task.verifier.timeout_seconds!r},
+            shell=False,
+        )
+    else:
+        evidence = subprocess.CompletedProcess([], 0)
+    if evidence.returncode != 0:
+        infrastructure_error = "trusted workspace evidence generation failed"
+except (OSError, subprocess.TimeoutExpired):
+    infrastructure_error = "trusted workspace evidence generation failed"
+passed = passed and infrastructure_error is None
 ended_at = datetime.now(timezone.utc)
 (logs / "stdout.txt").write_bytes(stdout_bytes)
 (logs / "stderr.txt").write_bytes(stderr_bytes)
@@ -127,18 +150,18 @@ raise SystemExit(0 if passed else 1)
 '''
 
 
-def write_verifier_wrapper(task: Task, path: Path) -> None:
-    path.write_text(_verifier_wrapper(task), encoding="utf-8")
+def write_verifier_wrapper(
+    task: Task, path: Path, *, trusted_workspace_evidence: bool = True
+) -> None:
+    path.write_text(
+        _verifier_wrapper(task, trusted_workspace_evidence=trusted_workspace_evidence),
+        encoding="utf-8",
+    )
 
 
 def _task_toml(task: Task, *, agent_network: str) -> str:
     if task.verifier is None:
         raise ValueError("Harbor coding tasks require a verifier")
-    collect_command = (
-        "mkdir -p /logs/artifacts && /usr/local/bin/python "
-        "/mogil/capture_workspace.py /mogil/before-workspace /workspace "
-        "/logs/artifacts/workspace"
-    )
     return f'''schema_version = "1.3"
 artifacts = [{{ source = "/workspace", destination = "candidate-workspace" }}]
 
@@ -158,11 +181,6 @@ workdir = "/workspace"
 timeout_sec = {task.verifier.timeout_seconds!r}
 environment_mode = "separate"
 network_mode = "no-network"
-
-[[verifier.collect]]
-service = "main"
-timeout_sec = {task.verifier.timeout_seconds!r}
-command = "{collect_command}"
 
 [verifier.environment]
 build_timeout_sec = {BUILD_TIMEOUT_SECONDS}.0
@@ -221,19 +239,21 @@ def translate_harbor_task(
     (environment_dir / "source-manifest.json").write_text(
         json.dumps({"files": manifest}, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    (environment_dir / "capture_workspace.py").write_text(
-        _workspace_capture_script(), encoding="utf-8"
-    )
     (environment_dir / "Dockerfile").write_text(
-        "FROM python:3.12-slim\n"
-        "COPY workspace/ /mogil/before-workspace/\n"
-        "COPY workspace/ /workspace/\n"
-        "COPY capture_workspace.py /mogil/capture_workspace.py\n"
-        "WORKDIR /workspace\n",
+        f"FROM {PYTHON_BASE_IMAGE}\nCOPY workspace/ /workspace/\nWORKDIR /workspace\n",
         encoding="utf-8",
     )
+    baseline_dir = tests_dir / "baseline"
+    _copy_candidate_fixture(source, baseline_dir)
+    (tests_dir / "capture_workspace.py").write_text(
+        _workspace_capture_script(), encoding="utf-8"
+    )
     (tests_dir / "Dockerfile").write_text(
-        "FROM python:3.12-slim\nCOPY . /tests/\nWORKDIR /artifacts/candidate-workspace\n",
+        f"FROM {PYTHON_BASE_IMAGE}\n"
+        "COPY . /tests/\n"
+        "COPY baseline/ /mogil/before-workspace/\n"
+        "COPY capture_workspace.py /mogil/capture_workspace.py\n"
+        "WORKDIR /artifacts/candidate-workspace\n",
         encoding="utf-8",
     )
     write_verifier_wrapper(task, tests_dir / "verify.py")

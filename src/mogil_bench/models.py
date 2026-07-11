@@ -238,5 +238,25 @@ class BlindBenchRecord(StrictModel):
         return value
 
 
+class HarborRunRecord(StrictModel):
+    bundle_version: Literal["1"]
+    logical_run_id: str = Field(min_length=1)
+    attempt_id: str = Field(min_length=1)
+    harbor_version: str = Field(min_length=1)
+    pi_version: str = Field(min_length=1)
+    agent_log_format: str = Field(min_length=1)
+    agent_outcome: AgentOutcome
+    verifier_outcome: VerifierOutcome
+    infrastructure_outcome: InfrastructureOutcome
+    evidence_status: EvidenceStatus
+    harbor_job_id: str | None = None
+    harbor_trial_id: str | None = None
+    trial_name: str | None = None
+    trial_uri: str | None = None
+    task_checksum: str | None = None
+    error: str | None = None
+    artifact_collection_error: str | None = None
+
+
 class BlindBenchBatch(StrictModel):
     records: list[BlindBenchRecord]

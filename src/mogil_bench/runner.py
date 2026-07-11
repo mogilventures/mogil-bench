@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import secrets
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from collections.abc import Callable
@@ -21,7 +23,13 @@ if TYPE_CHECKING:
     from .models import AttemptIdentity
 
 from .models import Configuration, Task
-from .packs import canonical_hash, pack_fingerprint, resolve_fixture, task_prompt
+from .packs import (
+    canonical_hash,
+    configuration_identity_v1,
+    pack_fingerprint,
+    resolve_fixture,
+    task_prompt,
+)
 
 MAX_OUTPUT_BYTES = 32_768
 PI_EXECUTABLE_ENV = "MOGIL_BENCH_PI_EXECUTABLE"
@@ -75,7 +83,7 @@ class _HarborBackend(Protocol):
         identity: AttemptIdentity,
         output_root: Path,
         *,
-        deterministic_fixture: bool = False,
+        _fixture_profile: object | None = None,
     ) -> HarborAttemptResult: ...
 
 
@@ -94,16 +102,18 @@ class RunResult:
     execution: Execution
 
 
+def _fixture_profile_token() -> object:
+    from .harbor_backend import _FIXTURE_PROFILE_TOKEN
+
+    return _FIXTURE_PROFILE_TOKEN
+
+
 def logical_run_id(fingerprint: str, task: Task, config: Configuration) -> str:
-    configuration = config.model_dump(mode="json")
-    for field in ("backend", "environment_type", "mounts"):
-        if config.adapter != "harbor":
-            configuration.pop(field, None)
     return "mogil-" + canonical_hash(
         {
             "pack_fingerprint": fingerprint,
             "task": task.model_dump(mode="json"),
-            "configuration": configuration,
+            "configuration": configuration_identity_v1(config),
         }
     )
 
@@ -315,10 +325,11 @@ def _pi(pack_path: Path, task: Task, config: Configuration, prompt: str) -> Exec
         )
 
 
-def run_pack(
+def _run_pack_to_directory(
     pack_path: Path,
     output_dir: Path,
     *,
+    final_output_dir: Path,
     allow_commands: bool = False,
     allow_agents: bool = False,
     harbor_backend: _HarborBackend | None = None,
@@ -326,7 +337,7 @@ def run_pack(
     host_pi: Callable[[Path, Task, Configuration, str], Execution] = _pi,
     attempt_id_factory: Callable[[], object] | None = None,
     canary_factory: Callable[[], str] | None = None,
-    test_agent_import_path: str | None = None,
+    _test_agent_import_path: str | None = None,
 ) -> Path:
     from .packs import load_pack
 
@@ -373,9 +384,9 @@ def run_pack(
                 identity,
                 temporary_root / "translation",
                 hidden_verifier=hidden_verifier,
-                test_agent_import_path=test_agent_import_path,
+                test_agent_import_path=_test_agent_import_path,
             )
-            (harbor_preflight or preflight)(output_dir, translation)
+            (harbor_preflight or preflight)(final_output_dir, translation)
             output_dir.mkdir(parents=True, exist_ok=False)
             (output_dir / "results").mkdir()
             backend = harbor_backend or HarborBackend()
@@ -384,7 +395,9 @@ def run_pack(
                     translation,
                     identity,
                     output_dir / "results",
-                    deterministic_fixture=test_agent_import_path is not None,
+                    _fixture_profile=(
+                        _fixture_profile_token() if _test_agent_import_path is not None else None
+                    ),
                 )
             )
             bundle_dir = attempt.bundle_dir
@@ -475,3 +488,106 @@ def run_pack(
 
     export_run(output_dir)
     return output_dir
+
+
+def _atomic_run(
+    pack_path: Path,
+    output_dir: Path,
+    **kwargs: Any,
+) -> Path:
+    if output_dir.exists():
+        raise FileExistsError(f"output path already exists: {output_dir}")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging_root = Path(
+        tempfile.mkdtemp(prefix=f".{output_dir.name}.staging-", dir=output_dir.parent)
+    )
+    staging = staging_root / "complete"
+    try:
+        _run_pack_to_directory(
+            pack_path,
+            staging,
+            final_output_dir=output_dir,
+            **kwargs,
+        )
+        staging.replace(output_dir)
+        staging_root.rmdir()
+        return output_dir
+    except BaseException:
+        shutil.rmtree(staging_root, ignore_errors=True)
+        raise
+
+
+_SHIPPED_FIXTURE_FINGERPRINT = (
+    "856415e01003df1ae8461f2bff251fd040c25e2dd9d0c3079531a8ce02c10317"
+)
+_SHIPPED_FIXTURE_HASHES = {
+    "agent.py": "e4310f9e2fb61b11040b5e2d3bbcf5cf4ad070f467a30887c1871d32e09e506c",
+    "calculator.py": "405aaadb887d880ae2e13d576ebd4524dd12a001bf832d778a05d243779dafcc",
+    "verify.py": "07f5cc0e302a62a5f99863034abb1c3fb03756daa27c82178522a86e684c0455",
+}
+_SHIPPED_FIXTURE_AGENT = "agent:DeterministicTestAgent"
+_SHIPPED_FIXTURE_AGENT_VERSION = "test-only-1"
+
+
+def _run_shipped_fixture_pack(
+    pack_path: Path,
+    output_dir: Path,
+    *,
+    canary_factory: Callable[[], str] | None = None,
+) -> Path:
+    """Run only the source-bound, credential-free repository smoke fixture."""
+    from .packs import load_pack
+
+    pack = load_pack(pack_path)
+    fingerprint = pack_fingerprint(pack_path, pack)
+    if fingerprint != _SHIPPED_FIXTURE_FINGERPRINT or len(pack.tasks) != 1:
+        raise ValueError("pack is not the immutable shipped Harbor fixture profile")
+    fixture = resolve_fixture(pack_path, pack.tasks[0])
+    actual_hashes = {
+        name: hashlib.sha256((fixture / name).read_bytes()).hexdigest()
+        for name in _SHIPPED_FIXTURE_HASHES
+    }
+    agent_source = (fixture / "agent.py").read_text(encoding="utf-8")
+    if (
+        actual_hashes != _SHIPPED_FIXTURE_HASHES
+        or f'return "{_SHIPPED_FIXTURE_AGENT_VERSION}"' not in agent_source
+    ):
+        raise ValueError("shipped Harbor fixture source hash or version mismatch")
+    previous_bytecode_setting = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        return _atomic_run(
+            pack_path,
+            output_dir,
+            allow_agents=True,
+            canary_factory=canary_factory,
+            _test_agent_import_path=_SHIPPED_FIXTURE_AGENT,
+        )
+    finally:
+        sys.dont_write_bytecode = previous_bytecode_setting
+
+
+def run_pack(
+    pack_path: Path,
+    output_dir: Path,
+    *,
+    allow_commands: bool = False,
+    allow_agents: bool = False,
+    harbor_backend: _HarborBackend | None = None,
+    harbor_preflight: Callable[[Path, HarborTranslation], None] | None = None,
+    host_pi: Callable[[Path, Task, Configuration, str], Execution] = _pi,
+    attempt_id_factory: Callable[[], object] | None = None,
+    canary_factory: Callable[[], str] | None = None,
+) -> Path:
+    """Build a complete run privately and publish it with one atomic rename."""
+    return _atomic_run(
+        pack_path,
+        output_dir,
+        allow_commands=allow_commands,
+        allow_agents=allow_agents,
+        harbor_backend=harbor_backend,
+        harbor_preflight=harbor_preflight,
+        host_pi=host_pi,
+        attempt_id_factory=attempt_id_factory,
+        canary_factory=canary_factory,
+    )

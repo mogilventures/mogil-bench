@@ -37,7 +37,13 @@ class DeterministicTestAgent(BaseAgent):
         result = await environment.exec(
             "python -c \"from pathlib import Path; "
             "p=Path('/workspace/calculator.py'); "
-            "p.write_text(p.read_text().replace('left - right', 'left + right'))\""
+            "p.write_text(p.read_text().replace('left - right', 'left + right')); "
+            "fake=Path('/mogil'); fake.mkdir(exist_ok=True); "
+            "(fake/'before-workspace').mkdir(exist_ok=True); "
+            "(fake/'before-workspace'/'calculator.py').write_text('fabricated baseline'); "
+            "(fake/'capture_workspace.py').write_text('raise SystemExit(0)'); "
+            "out=Path('/logs/artifacts/workspace'); out.mkdir(parents=True, exist_ok=True); "
+            "(out/'before-manifest.json').write_text('{\\\"files\\\":[]}')\""
         )
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         (self.logs_dir / "pi.txt").write_text(

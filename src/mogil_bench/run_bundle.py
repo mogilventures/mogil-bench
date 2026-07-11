@@ -4,14 +4,18 @@ import difflib
 import hashlib
 import json
 import math
+import os
 import stat
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .models import EvidenceStatus
 
+DEFAULT_MAX_FILES = 4096
 DEFAULT_MAX_FILE_BYTES = 4 * 1024 * 1024
 DEFAULT_MAX_TOTAL_BYTES = 32 * 1024 * 1024
+DEFAULT_MAX_DIFF_BYTES = 512 * 1024
+HASH_CHUNK_BYTES = 64 * 1024
 
 
 class BundleError(ValueError):
@@ -30,19 +34,77 @@ def _files(root: Path) -> dict[str, Path]:
     return result
 
 
-def _manifest(root: Path) -> dict[str, object]:
+def _hash_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(HASH_CHUNK_BYTES):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _bounded_paths(root: Path, max_files: int) -> tuple[list[tuple[str, Path]], bool]:
+    found: list[tuple[str, Path]] = []
+    pending = [root]
+    scanned_nodes = 0
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as iterator:
+            for item in iterator:
+                scanned_nodes += 1
+                if scanned_nodes > max_files:
+                    return sorted(found), True
+                path = Path(item.path)
+                relative = path.relative_to(root).as_posix()
+                if item.is_symlink():
+                    raise BundleError(f"symlinks are not allowed: {relative}")
+                if item.is_dir(follow_symlinks=False):
+                    pending.append(path)
+                elif item.is_file(follow_symlinks=False):
+                    found.append((relative, path))
+                else:
+                    raise BundleError(f"special files are not allowed: {relative}")
+    return sorted(found), False
+
+
+def _bounded_manifest(
+    root: Path, *, max_files: int, max_file_bytes: int, max_total_bytes: int
+) -> tuple[dict[str, Path], dict[str, Any]]:
+    files: dict[str, Path] = {}
     entries: list[dict[str, object]] = []
-    for relative, path in _files(root).items():
-        data = path.read_bytes()
-        entries.append(
-            {
-                "path": relative,
-                "sha256": hashlib.sha256(data).hexdigest(),
-                "size": len(data),
-                "mode": f"{stat.S_IMODE(path.stat().st_mode):04o}",
-            }
-        )
-    return {"files": entries}
+    omissions: list[dict[str, object]] = []
+    candidates, count_limited = _bounded_paths(root, max_files)
+    if count_limited:
+        omissions.append({"path": "<additional-paths>", "reason": "file_count_limit"})
+    total = 0
+    for relative, path in candidates:
+        metadata = path.stat()
+        size = metadata.st_size
+        base: dict[str, object] = {
+            "path": relative,
+            "size": size,
+            "mode": f"{stat.S_IMODE(metadata.st_mode):04o}",
+        }
+        if size > max_file_bytes:
+            omissions.append({**base, "reason": "per_file_byte_limit"})
+            continue
+        if total + size > max_total_bytes:
+            omissions.append({**base, "reason": "total_byte_limit"})
+            continue
+        total += size
+        digest = _hash_file(path)
+        entries.append({**base, "sha256": digest})
+        files[relative] = path
+    return files, {
+        "complete": not omissions,
+        "files": entries,
+        "omissions": omissions,
+        "limits": {
+            "max_files": max_files,
+            "max_file_bytes": max_file_bytes,
+            "max_total_bytes": max_total_bytes,
+        },
+        "hashed_bytes": total,
+    }
 
 
 def _text_lines(data: bytes) -> list[str] | None:
@@ -54,9 +116,17 @@ def _text_lines(data: bytes) -> list[str] | None:
         return None
 
 
-def _patch_entry(relative: str, before: Path | None, after: Path | None) -> str:
-    before_data = before.read_bytes() if before is not None else b""
-    after_data = after.read_bytes() if after is not None else b""
+def _patch_entry(
+    relative: str, before: Path | None, after: Path | None, *, max_diff_bytes: int
+) -> str:
+    before_size = before.stat().st_size if before is not None else 0
+    after_size = after.stat().st_size if after is not None else 0
+    before_data = (
+        before.read_bytes() if before is not None and before_size <= max_diff_bytes else b""
+    )
+    after_data = (
+        after.read_bytes() if after is not None and after_size <= max_diff_bytes else b""
+    )
     before_mode = stat.S_IMODE(before.stat().st_mode) if before is not None else None
     after_mode = stat.S_IMODE(after.stat().st_mode) if after is not None else None
     lines = [f"diff --git a/{relative} b/{relative}\n"]
@@ -69,6 +139,12 @@ def _patch_entry(relative: str, before: Path | None, after: Path | None) -> str:
             lines.extend(
                 [f"old mode 100{before_mode:03o}\n", f"new mode 100{after_mode:03o}\n"]
             )
+    if before_size > max_diff_bytes or after_size > max_diff_bytes:
+        lines.append(
+            f"MOGIL EVIDENCE BOUNDED: a/{relative} or b/{relative} exceeds "
+            f"diff limit {max_diff_bytes} bytes\n"
+        )
+        return "".join(lines)
     before_lines = _text_lines(before_data)
     after_lines = _text_lines(after_data)
     if before_data != after_data:
@@ -86,10 +162,31 @@ def _patch_entry(relative: str, before: Path | None, after: Path | None) -> str:
     return "".join(lines)
 
 
-def build_workspace_evidence(before: Path, after: Path, output: Path) -> None:
-    before_files = _files(before)
-    after_files = _files(after)
+def build_workspace_evidence(
+    before: Path,
+    after: Path,
+    output: Path,
+    *,
+    max_files: int = DEFAULT_MAX_FILES,
+    max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
+    max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
+    max_diff_bytes: int = DEFAULT_MAX_DIFF_BYTES,
+) -> None:
+    before_files, before_manifest = _bounded_manifest(
+        before,
+        max_files=max_files,
+        max_file_bytes=max_file_bytes,
+        max_total_bytes=max_total_bytes,
+    )
+    after_files, after_manifest = _bounded_manifest(
+        after,
+        max_files=max_files,
+        max_file_bytes=max_file_bytes,
+        max_total_bytes=max_total_bytes,
+    )
     output.mkdir(parents=True, exist_ok=False)
+    before_entries = {item["path"]: item for item in before_manifest["files"]}
+    after_entries = {item["path"]: item for item in after_manifest["files"]}
     changed: list[dict[str, str]] = []
     patches: list[str] = []
     for relative in sorted(before_files.keys() | after_files.keys()):
@@ -99,17 +196,30 @@ def build_workspace_evidence(before: Path, after: Path, output: Path) -> None:
             status = "added"
         elif new is None:
             status = "deleted"
-        elif old.read_bytes() != new.read_bytes():
+        elif before_entries[relative]["sha256"] != after_entries[relative]["sha256"]:
             status = "modified"
-        elif stat.S_IMODE(old.stat().st_mode) != stat.S_IMODE(new.stat().st_mode):
+        elif before_entries[relative]["mode"] != after_entries[relative]["mode"]:
             status = "mode_changed"
         else:
             continue
         changed.append({"path": relative, "status": status})
-        patches.append(_patch_entry(relative, old, new))
+        patches.append(_patch_entry(relative, old, new, max_diff_bytes=max_diff_bytes))
+    omissions = [*before_manifest["omissions"], *after_manifest["omissions"]]
+    for omission in omissions:
+        changed.append(
+            {
+                "path": str(omission["path"]),
+                "status": "evidence_omitted",
+                "reason": str(omission["reason"]),
+            }
+        )
+        patches.append(
+            f"MOGIL EVIDENCE BOUNDED: {omission['path']} omitted "
+            f"({omission['reason']})\n"
+        )
     for name, value in (
-        ("before-manifest.json", _manifest(before)),
-        ("after-manifest.json", _manifest(after)),
+        ("before-manifest.json", before_manifest),
+        ("after-manifest.json", after_manifest),
         ("changed-files.json", changed),
     ):
         (output / name).write_text(
@@ -333,7 +443,12 @@ def classify_evidence(
         changed = json.loads(
             (bundle_root / "workspace/changed-files.json").read_text(encoding="utf-8")
         )
-        if not isinstance(before.get("files"), list) or not isinstance(after.get("files"), list):
+        if (
+            before.get("complete") is not True
+            or after.get("complete") is not True
+            or not isinstance(before.get("files"), list)
+            or not isinstance(after.get("files"), list)
+        ):
             return EvidenceStatus.INSUFFICIENT
         if not isinstance(changed, list) or not changed:
             return EvidenceStatus.INSUFFICIENT

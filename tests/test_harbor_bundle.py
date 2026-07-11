@@ -63,6 +63,52 @@ def test_workspace_evidence_tracks_modified_added_deleted_and_modes(tmp_path: Pa
     assert "old mode 100644" in patch and "new mode 100755" in patch
 
 
+def test_workspace_evidence_is_bounded_and_marks_binary_and_oversized_files(
+    tmp_path: Path,
+) -> None:
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    before.mkdir()
+    after.mkdir()
+    (before / "binary.bin").write_bytes(b"\x00old")
+    (after / "binary.bin").write_bytes(b"\x00new")
+    (after / "a-large.txt").write_bytes(b"x" * 20)
+    (after / "extra.txt").write_text("extra", encoding="utf-8")
+
+    output = tmp_path / "evidence"
+    build_workspace_evidence(
+        before,
+        after,
+        output,
+        max_files=2,
+        max_file_bytes=8,
+        max_total_bytes=32,
+        max_diff_bytes=8,
+    )
+
+    after_manifest = json.loads((output / "after-manifest.json").read_text())
+    assert after_manifest["complete"] is False
+    assert after_manifest["omissions"]
+    patch = (output / "patch.diff").read_text(encoding="utf-8")
+    assert "Binary files a/binary.bin and b/binary.bin differ" in patch
+    assert "MOGIL EVIDENCE BOUNDED" in patch
+
+    total_output = tmp_path / "total-evidence"
+    build_workspace_evidence(
+        before,
+        after,
+        total_output,
+        max_files=10,
+        max_file_bytes=100,
+        max_total_bytes=5,
+    )
+    total_manifest = json.loads((total_output / "after-manifest.json").read_text())
+    assert any(
+        omission["reason"] == "total_byte_limit"
+        for omission in total_manifest["omissions"]
+    )
+
+
 def test_safe_collection_rejects_unsafe_paths_links_special_files_and_sizes(
     tmp_path: Path,
 ) -> None:
@@ -139,7 +185,7 @@ def test_verifier_streams_are_independently_bounded_and_rich(tmp_path: Path) -> 
     )
     wrapper = tmp_path / "verify.py"
     logs = tmp_path / "logs"
-    write_verifier_wrapper(task, wrapper)
+    write_verifier_wrapper(task, wrapper, trusted_workspace_evidence=False)
 
     completed = subprocess.run(
         [sys.executable, str(wrapper)],
@@ -175,7 +221,7 @@ def test_verifier_timeout_is_recorded_and_malformed_reward_rejected(tmp_path: Pa
     )
     wrapper = tmp_path / "verify.py"
     logs = tmp_path / "logs"
-    write_verifier_wrapper(task, wrapper)
+    write_verifier_wrapper(task, wrapper, trusted_workspace_evidence=False)
 
     completed = subprocess.run(
         [sys.executable, str(wrapper)],
@@ -260,8 +306,8 @@ def complete_bundle(root: Path) -> Path:
             "verifier_outcome": "passed",
             "infrastructure_outcome": "succeeded",
         },
-        "workspace/before-manifest.json": {"files": []},
-        "workspace/after-manifest.json": {"files": []},
+        "workspace/before-manifest.json": {"complete": True, "files": [], "omissions": []},
+        "workspace/after-manifest.json": {"complete": True, "files": [], "omissions": []},
         "workspace/changed-files.json": [{"path": "calculator.py", "status": "modified"}],
         "verifier/reward.json": {
             "reward": 1.0,
@@ -329,8 +375,12 @@ def test_harbor_bundle_projects_to_reviewer_safe_blindbench_v1(tmp_path: Path) -
     (bundle / "run.json").write_text(
         json.dumps(
             {
+                "bundle_version": "1",
                 "logical_run_id": "logical",
                 "attempt_id": "attempt",
+                "harbor_version": "0.18.0",
+                "pi_version": "0.80.6",
+                "agent_log_format": "deterministic_test_agent_log",
                 "evidence_status": "fixture_complete",
                 "agent_outcome": "succeeded",
                 "verifier_outcome": "passed",
@@ -395,3 +445,33 @@ def test_harbor_bundle_projects_to_reviewer_safe_blindbench_v1(tmp_path: Path) -
     assert "hidden-host-id" not in serialized
     assert "hidden-project" not in serialized
     assert str(tmp_path) not in serialized
+
+
+def test_harbor_export_rejects_symlink_components_and_malformed_run(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "run.json").write_text("{}", encoding="utf-8")
+    (run_dir / "results").mkdir(parents=True)
+    (run_dir / "results/link").symlink_to(outside, target_is_directory=True)
+    manifest = {
+        "schema_version": "1",
+        "created_at": "2026-07-11T00:00:00Z",
+        "pack": {"id": "p", "revision": "1", "fingerprint": "f"},
+        "result_count": 1,
+        "results": [{"bundle": "results/link"}],
+    }
+    (run_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="symlink"):
+        export_run(run_dir)
+
+    (run_dir / "results/link").unlink()
+    malformed = run_dir / "results/bundle"
+    malformed.mkdir()
+    (malformed / "run.json").write_text(
+        '{"attempt_id":"attempt","unexpected":true}', encoding="utf-8"
+    )
+    manifest["results"][0]["bundle"] = "results/bundle"
+    (run_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid Mogil Harbor run.json"):
+        export_run(run_dir)

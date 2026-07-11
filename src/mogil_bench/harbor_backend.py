@@ -20,6 +20,7 @@ from .models import AttemptIdentity, EvidenceStatus
 
 HARBOR_VERSION = "0.18.0"
 PI_VERSION = "0.80.6"
+_FIXTURE_PROFILE_TOKEN = object()
 
 
 class _Job(Protocol):
@@ -270,10 +271,11 @@ class HarborBackend:
         identity: AttemptIdentity,
         output_root: Path,
         *,
-        deterministic_fixture: bool = False,
+        _fixture_profile: object | None = None,
     ) -> HarborAttemptResult:
         from .run_bundle import classify_evidence, collect_files, write_checksums
 
+        deterministic_fixture = _fixture_profile is _FIXTURE_PROFILE_TOKEN
         logical_run_id = identity.logical_run_id
         attempt_id = identity.attempt_id
         if not _security_invariants(translation):
@@ -381,8 +383,11 @@ class HarborBackend:
                         run[destination] = str(value)
 
             _json_file(bundle_dir / "run.json", run)
+            from .harbor_tasks import PYTHON_BASE_IMAGE
+
             environment = {
                 "type": "docker",
+                "base_image": PYTHON_BASE_IMAGE,
                 "delete": True,
                 "mounts": [],
                 "requested": translation.environment_config,
@@ -393,7 +398,7 @@ class HarborBackend:
 
             if job is not None and isinstance(trial_name, str):
                 source_root = job.job_dir
-                workspace_source = f"{trial_name}/artifacts/logs/artifacts/workspace"
+                workspace_source = f"{trial_name}/verifier/workspace"
                 sources = {
                     "harbor/job-config.json": "config.json",
                     "harbor/job-lock.json": "lock.json",
