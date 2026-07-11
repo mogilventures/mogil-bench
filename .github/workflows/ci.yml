@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e '.[dev]'
+      - run: pytest -q
+      - run: ruff check .
+      - run: mypy
+      - name: Credential-free artifact smoke test
+        run: |
+          mogil-bench pack validate packs/sample-v1.yaml
+          mogil-bench run packs/sample-v1.yaml --output-dir /tmp/mogil-bench-ci
+          mogil-bench artifact validate /tmp/mogil-bench-ci/blindbench.json
