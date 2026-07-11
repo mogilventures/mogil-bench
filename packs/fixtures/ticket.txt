@@ -1,0 +1,4 @@
+Customer: Example Books (fictional)
+Issue: The weekly inventory export shows duplicate rows after a timezone change.
+Impact: Reporting is delayed; no customer or payment data is involved.
+Request: Confirm investigation steps and provide a workaround.
