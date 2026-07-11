@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import StrEnum
 from typing import Any, Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, field_validator, model_validator
 
@@ -21,6 +23,68 @@ class PrivacyClass(StrEnum):
 class Lane(StrEnum):
     HERMES_TEXT = "hermes-text"
     PI_CODING = "pi-coding"
+
+
+class Backend(StrEnum):
+    HARBOR = "harbor"
+
+
+class EnvironmentType(StrEnum):
+    DOCKER = "docker"
+
+
+class EvidenceStatus(StrEnum):
+    NON_QUALITY = "non_quality"
+    INSUFFICIENT = "insufficient"
+    FIXTURE_COMPLETE = "fixture_complete"
+
+
+class AgentOutcome(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    TIMED_OUT = "timed_out"
+
+
+class VerifierOutcome(StrEnum):
+    PASSED = "passed"
+    FAILED = "failed"
+    TIMED_OUT = "timed_out"
+    NOT_RUN = "not_run"
+
+
+class InfrastructureOutcome(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class CleanupStatus(StrEnum):
+    CONFIRMED = "confirmed"
+    FAILED = "failed"
+    UNKNOWN = "unknown"
+
+
+class AttemptIdentity(StrictModel):
+    logical_run_id: str = Field(min_length=1)
+    attempt_id: str = Field(min_length=1)
+
+
+def create_attempt_identity(
+    logical_run_id: str,
+    *,
+    attempt_id_factory: Callable[[], object] = uuid4,
+) -> AttemptIdentity:
+    return AttemptIdentity(
+        logical_run_id=logical_run_id,
+        attempt_id=str(attempt_id_factory()),
+    )
+
+
+class CleanupEvidence(StrictModel):
+    status: CleanupStatus
+    requested: bool
+    started_at: str | None = None
+    ended_at: str | None = None
+    error: str | None = None
 
 
 class Verifier(StrictModel):
@@ -60,8 +124,11 @@ class Configuration(StrictModel):
     id: str = Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
     provider: str = Field(min_length=1)
     model: str = Field(min_length=1)
-    adapter: Literal["mock", "command", "pi"]
+    adapter: Literal["mock", "command", "pi", "harbor"]
     harness: Harness
+    backend: Backend | None = None
+    environment_type: EnvironmentType | None = None
+    mounts: list[dict[str, str]] = Field(default_factory=list)
 
     @field_validator("provider", "model")
     @classmethod
@@ -69,6 +136,17 @@ class Configuration(StrictModel):
         if value.startswith("-") or any(character in value for character in ("\x00", "\n", "\r")):
             raise ValueError("provider and model must be safe CLI values")
         return value
+
+    @model_validator(mode="after")
+    def validate_backend(self) -> Configuration:
+        if self.adapter == "harbor":
+            self.backend = self.backend or Backend.HARBOR
+            self.environment_type = self.environment_type or EnvironmentType.DOCKER
+            if self.mounts:
+                raise ValueError("Harbor configurations require empty mounts")
+        elif self.backend is not None or self.environment_type is not None or self.mounts:
+            raise ValueError("backend, environment_type, and mounts require adapter=harbor")
+        return self
 
 
 class Pack(StrictModel):
@@ -90,8 +168,13 @@ class Pack(StrictModel):
                 raise ValueError(f"duplicate {label} id")
         if any(c.adapter == "command" for c in self.configurations) and not self.allow_commands:
             raise ValueError("command adapter requires pack allow_commands: true")
-        if any(c.adapter == "pi" for c in self.configurations) and not self.allow_agents:
-            raise ValueError("pi adapter requires pack allow_agents: true")
+        agent_configs = [c for c in self.configurations if c.adapter in {"pi", "harbor"}]
+        if agent_configs and not self.allow_agents:
+            raise ValueError("pi and harbor adapters require pack allow_agents: true")
+        if any(c.adapter == "harbor" for c in self.configurations) and any(
+            task.lane != Lane.PI_CODING for task in self.tasks
+        ):
+            raise ValueError("harbor adapter is valid only for the pi-coding lane")
         return self
 
 

@@ -11,18 +11,15 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e '.[dev]'
-      - run: pytest -q
+      - run: pytest -q -m "not docker_smoke"
       - run: ruff check .
       - run: mypy
       - name: Credential-free artifact smoke test
@@ -30,3 +27,17 @@ jobs:
           mogil-bench pack validate packs/sample-v1.yaml
           mogil-bench run packs/sample-v1.yaml --output-dir /tmp/mogil-bench-ci
           mogil-bench artifact validate /tmp/mogil-bench-ci/blindbench.json
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e '.[dev]'
+      - run: docker info
+      - name: Mandatory Harbor Docker smoke
+        run: pytest -q -m docker_smoke tests/test_harbor_docker_smoke.py

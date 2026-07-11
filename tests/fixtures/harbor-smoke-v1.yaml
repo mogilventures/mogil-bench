@@ -1,0 +1,28 @@
+version: "1"
+id: mogil-harbor-smoke-v1
+revision: "1"
+name: Credential-free Harbor Docker smoke
+allow_agents: true
+tasks:
+  - id: calculator-fix
+    category: coding
+    lane: pi-coding
+    prompt: Correct add() so it returns the sum of its two arguments.
+    fixture: harbor-coding-task
+    timeout_seconds: 30
+    verifier:
+      argv:
+        - /usr/local/bin/python
+        - /tests/hidden_verify.py
+        - /workspace
+      timeout_seconds: 20
+      expected_exit_code: 0
+      stdout_contains: fixture passed
+configurations:
+  - id: deterministic-harbor
+    provider: local-test
+    model: deterministic
+    adapter: harbor
+    harness:
+      name: harbor
+      version: "0.18.0"

@@ -299,6 +299,7 @@ def test_export_shape_and_validation(tmp_path: Path) -> None:
     assert record["input"]["messages"]
     assert set(record["usage"]) == {"duration_ms"}
     assert "cost_usd" not in record["usage"]
+    assert record["metadata"]["evidence_status"] == "non_quality"
     assert validate_artifact(run_dir / "blindbench.json") == 2
     assert validate_artifact(run_dir / "blindbench.jsonl") == 2
 
