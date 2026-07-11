@@ -17,6 +17,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+daytona = [
+  "daytona==0.196.0",
+  "harbor[daytona]==0.18.0",
+]
 dev = [
   "mypy>=1.10,<2",
   "pytest>=8.2,<9",
@@ -32,7 +36,10 @@ packages = ["src/mogil_bench"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["docker_smoke: real mandatory Harbor and local Docker integration"]
+markers = [
+  "docker_smoke: real mandatory Harbor and local Docker integration",
+  "daytona_smoke: manually gated live Harbor and Daytona integration",
+]
 
 [tool.ruff]
 target-version = "py312"

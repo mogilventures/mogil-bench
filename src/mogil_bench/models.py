@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from enum import StrEnum
 from typing import Any, Literal
@@ -31,6 +32,50 @@ class Backend(StrEnum):
 
 class EnvironmentType(StrEnum):
     DOCKER = "docker"
+    DAYTONA = "daytona"
+
+
+class NetworkMode(StrEnum):
+    NO_NETWORK = "no-network"
+    ALLOWLIST = "allowlist"
+
+
+class SandboxPolicy(StrictModel):
+    """Provider-neutral requested sandbox policy parsed from a pack."""
+
+    image: str = Field(pattern=r"^[^\s]+@sha256:[0-9a-f]{64}$")
+    cpus: int = Field(ge=1, le=64)
+    memory_mb: int = Field(ge=1024, le=262144, multiple_of=1024)
+    storage_mb: int = Field(ge=4096, le=1048576, multiple_of=1024)
+    network_mode: NetworkMode
+    allowed_hosts: list[str] = Field(default_factory=list, max_length=64)
+    secret_refs: dict[str, str] = Field(default_factory=dict)
+    max_lifetime_minutes: int = Field(default=120, ge=5, le=1440)
+
+    @model_validator(mode="after")
+    def validate_network_and_secrets(self) -> SandboxPolicy:
+        if self.network_mode == NetworkMode.NO_NETWORK and self.allowed_hosts:
+            raise ValueError("allowed_hosts requires network_mode=allowlist")
+        if self.network_mode == NetworkMode.ALLOWLIST and not self.allowed_hosts:
+            raise ValueError("allowlist network policy requires allowed_hosts")
+        if self.secret_refs and self.network_mode != NetworkMode.ALLOWLIST:
+            raise ValueError("secret references require restricted allowlist networking")
+        safe_name = re.compile(r"^[A-Z][A-Z0-9_]*$")
+        safe_ref = re.compile(r"^ref:[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+        if any(not safe_name.fullmatch(key) for key in self.secret_refs):
+            raise ValueError("secret reference keys must be environment variable names")
+        if any(not safe_ref.fullmatch(value) for value in self.secret_refs.values()):
+            raise ValueError("secret references must use ref:<organization-secret-name>")
+        if any(
+            not host
+            or len(host) > 253
+            or "://" in host
+            or "/" in host
+            or "@" in host
+            for host in self.allowed_hosts
+        ):
+            raise ValueError("allowed_hosts must contain hostnames, not URLs or credentials")
+        return self
 
 
 class EvidenceStatus(StrEnum):
@@ -129,6 +174,7 @@ class Configuration(StrictModel):
     harness: Harness
     backend: Backend | None = None
     environment_type: EnvironmentType | None = None
+    environment_policy: SandboxPolicy | None = None
     mounts: list[dict[str, str]] = Field(default_factory=list)
 
     @field_validator("provider", "model")
@@ -145,8 +191,20 @@ class Configuration(StrictModel):
             self.environment_type = self.environment_type or EnvironmentType.DOCKER
             if self.mounts:
                 raise ValueError("Harbor configurations require empty mounts")
-        elif self.backend is not None or self.environment_type is not None or self.mounts:
-            raise ValueError("backend, environment_type, and mounts require adapter=harbor")
+            if self.environment_type == EnvironmentType.DAYTONA:
+                if self.environment_policy is None:
+                    raise ValueError("Daytona requires an explicit pinned environment_policy")
+                if not self.environment_policy.secret_refs:
+                    raise ValueError("Daytona requires restricted secret_refs")
+        elif (
+            self.backend is not None
+            or self.environment_type is not None
+            or self.environment_policy is not None
+            or self.mounts
+        ):
+            raise ValueError(
+                "backend, environment_type, environment_policy, and mounts require adapter=harbor"
+            )
         return self
 
 

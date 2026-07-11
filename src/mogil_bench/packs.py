@@ -62,8 +62,10 @@ def configuration_identity_v1(config: Configuration) -> dict[str, Any]:
     """Return the immutable v1 identity shape, preserving pre-Harbor IDs."""
     value = config.model_dump(mode="json")
     if config.adapter != "harbor":
-        for field in ("backend", "environment_type", "mounts"):
+        for field in ("backend", "environment_type", "environment_policy", "mounts"):
             value.pop(field, None)
+    elif config.environment_policy is None:
+        value.pop("environment_policy", None)
     return value
 
 

@@ -384,6 +384,132 @@ def _read_object(path: Path) -> dict[str, Any]:
     return value
 
 
+def _valid_daytona_effective_policy(
+    bundle_root: Path,
+    *,
+    requested: dict[str, Any],
+    effective: object,
+    cleanup: dict[str, Any],
+) -> bool:
+    if not isinstance(effective, dict) or set(effective) != {
+        "source",
+        "agent",
+        "verifier",
+    }:
+        return False
+    if effective.get("source") != "provider-reported":
+        return False
+    cleanup_receipts = cleanup.get("deletion_receipts")
+    identifiers = cleanup.get("resource_identifiers")
+    if (
+        not isinstance(cleanup_receipts, list)
+        or len(cleanup_receipts) != 2
+        or not isinstance(identifiers, list)
+        or len(identifiers) != 2
+        or any(not isinstance(identifier, str) for identifier in identifiers)
+        or any(
+            not isinstance(item, dict)
+            or set(item)
+            != {"attempt_id", "session_id", "sandbox_id", "status", "error"}
+            for item in cleanup_receipts
+        )
+        or {item["session_id"] for item in cleanup_receipts} != set(identifiers)
+    ):
+        return False
+    expected_sessions = {"agent": identifiers[0], "verifier": identifiers[1]}
+    cleanup_ids = {
+        item.get("sandbox_id")
+        for item in cleanup_receipts
+        if isinstance(item, dict) and item.get("status") == "confirmed"
+    }
+    provider_ids: set[str] = set()
+    for role in ("agent", "verifier"):
+        role_effective = effective.get(role)
+        if not isinstance(role_effective, dict) or set(role_effective) != {
+            "cpus",
+            "memory_mb",
+            "storage_mb",
+            "network_mode",
+            "allowed_hosts",
+            "attempt_label_verified",
+            "runtime_prerequisites_verified",
+        }:
+            return False
+        cpus = role_effective.get("cpus")
+        memory_mb = role_effective.get("memory_mb")
+        storage_mb = role_effective.get("storage_mb")
+        allowed_hosts = role_effective.get("allowed_hosts")
+        if (
+            not isinstance(cpus, (int, float))
+            or isinstance(cpus, bool)
+            or not math.isfinite(float(cpus))
+            or cpus <= 0
+            or not isinstance(memory_mb, int)
+            or isinstance(memory_mb, bool)
+            or not isinstance(storage_mb, int)
+            or isinstance(storage_mb, bool)
+            or not isinstance(allowed_hosts, list)
+            or len(allowed_hosts) > 64
+            or any(
+                not isinstance(host, str) or len(host) > 253
+                for host in allowed_hosts
+            )
+            or role_effective.get("attempt_label_verified") is not True
+            or role_effective.get("runtime_prerequisites_verified") is not True
+            or cpus < requested["cpus"]
+            or memory_mb < requested["memory_mb"]
+            or storage_mb < requested["storage_mb"]
+        ):
+            return False
+        if role == "agent" and (
+            role_effective.get("network_mode") != requested["network_mode"]
+            or sorted(allowed_hosts) != sorted(requested["allowed_hosts"])
+        ):
+            return False
+        if role == "verifier" and (
+            role_effective.get("network_mode") != "no-network" or allowed_hosts != []
+        ):
+            return False
+        receipt_path = bundle_root / f"environment/provider-policy-{role}.json"
+        try:
+            receipt = _read_object(receipt_path)
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+            return False
+        create_parameters = receipt.get("create_parameters")
+        sandbox_id = receipt.get("sandbox_id")
+        if (
+            set(receipt)
+            != {
+                "version",
+                "attempt_id",
+                "session_id",
+                "sandbox_id",
+                "role",
+                "source",
+                "effective",
+                "create_parameters",
+                "status",
+                "error",
+            }
+            or receipt.get("version") != "1"
+            or receipt.get("role") != role
+            or receipt.get("session_id") != expected_sessions[role]
+            or receipt.get("source") != "daytona_provider_refresh"
+            or receipt.get("status") != "verified"
+            or receipt.get("error") is not None
+            or receipt.get("effective") != role_effective
+            or not isinstance(sandbox_id, str)
+            or not isinstance(create_parameters, dict)
+            or not isinstance(
+                create_parameters.get("secret_references_attached"), bool
+            )
+            or create_parameters["secret_references_attached"] != (role == "agent")
+        ):
+            return False
+        provider_ids.add(sandbox_id)
+    return provider_ids == cleanup_ids and len(provider_ids) == 2
+
+
 def finalize_real_pi_evidence(
     bundle_root: Path,
     *,
@@ -499,19 +625,66 @@ def classify_evidence(
             return EvidenceStatus.INSUFFICIENT
         if run.get("infrastructure_outcome") != "succeeded":
             return EvidenceStatus.INSUFFICIENT
-        if environment.get("type") != "docker" or environment.get("mounts") != []:
-            return EvidenceStatus.INSUFFICIENT
-        if environment.get("delete") is not True:
-            return EvidenceStatus.INSUFFICIENT
-        if not isinstance(environment.get("requested"), dict) or not isinstance(
-            environment.get("effective"), dict
+        if (
+            environment.get("schema_version") != "1"
+            or environment.get("class") != "isolated-sandbox"
+            or environment.get("provider") not in {"docker", "daytona"}
+            or environment.get("mounts") != []
+            or environment.get("delete") is not True
         ):
             return EvidenceStatus.INSUFFICIENT
-        if cleanup.get("status") != "confirmed" or cleanup.get("remaining_container_ids") != []:
+        requested = environment.get("requested")
+        effective = environment.get("effective")
+        if not isinstance(requested, dict):
             return EvidenceStatus.INSUFFICIENT
-        if cleanup.get("error") is not None or not cleanup.get("project_identifiers"):
+        required_policy = {
+            "provider",
+            "image",
+            "cpus",
+            "memory_mb",
+            "storage_mb",
+            "network_mode",
+            "allowed_hosts",
+            "verifier_network_mode",
+            "secret_transport",
+            "delete",
+            "mounts",
+        }
+        if set(requested) != required_policy:
             return EvidenceStatus.INSUFFICIENT
-        if not cleanup.get("compose_project_labels"):
+        if (
+            not isinstance(requested.get("image"), str)
+            or "@sha256:" not in requested["image"]
+            or not isinstance(requested.get("cpus"), int)
+            or requested["cpus"] < 1
+            or not isinstance(requested.get("memory_mb"), int)
+            or requested["memory_mb"] < 1024
+            or not isinstance(requested.get("storage_mb"), int)
+            or requested["storage_mb"] < 4096
+            or requested.get("verifier_network_mode") != "no-network"
+        ):
+            return EvidenceStatus.INSUFFICIENT
+        if requested["provider"] == "docker" and effective != requested:
+            return EvidenceStatus.INSUFFICIENT
+        if requested["provider"] == "daytona" and (
+            requested.get("network_mode") != "allowlist"
+            or not requested.get("allowed_hosts")
+            or requested.get("secret_transport") != "restricted_reference"
+            or not _valid_daytona_effective_policy(
+                bundle_root,
+                requested=requested,
+                effective=effective,
+                cleanup=cleanup,
+            )
+        ):
+            return EvidenceStatus.INSUFFICIENT
+        if cleanup.get("status") != "confirmed" or cleanup.get("remaining_resource_ids") != []:
+            return EvidenceStatus.INSUFFICIENT
+        if cleanup.get("error") is not None or not cleanup.get("resource_identifiers"):
+            return EvidenceStatus.INSUFFICIENT
+        if environment["provider"] == "docker" and not cleanup.get(
+            "compose_project_labels"
+        ):
             return EvidenceStatus.INSUFFICIENT
         if verification.get("verifier_outcome") != "passed":
             return EvidenceStatus.INSUFFICIENT

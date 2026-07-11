@@ -83,7 +83,7 @@ def test_harbor_config_is_narrow_and_serializes_defaults() -> None:
 
     with pytest.raises(ValidationError, match="backend"):
         harbor_configuration(backend="other")
-    with pytest.raises(ValidationError, match="environment_type"):
+    with pytest.raises(ValidationError, match="environment_policy"):
         harbor_configuration(environment_type="daytona")
     with pytest.raises(ValidationError, match="mounts"):
         harbor_configuration(mounts=[{"source": "/tmp", "target": "/work"}])

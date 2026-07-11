@@ -281,14 +281,42 @@ def complete_bundle(root: Path) -> Path:
             "infrastructure_outcome": "succeeded",
         },
         "environment.json": {
-            "type": "docker",
+            "schema_version": "1",
+            "class": "isolated-sandbox",
+            "provider": "docker",
             "mounts": [],
             "delete": True,
-            "requested": {},
-            "effective": {},
+            "requested": {
+                "provider": "docker",
+                "image": "python@sha256:" + "a" * 64,
+                "cpus": 1,
+                "memory_mb": 2048,
+                "storage_mb": 4096,
+                "network_mode": "public",
+                "allowed_hosts": [],
+                "verifier_network_mode": "no-network",
+                "secret_transport": "host_environment",
+                "delete": True,
+                "mounts": [],
+            },
+            "effective": {
+                "provider": "docker",
+                "image": "python@sha256:" + "a" * 64,
+                "cpus": 1,
+                "memory_mb": 2048,
+                "storage_mb": 4096,
+                "network_mode": "public",
+                "allowed_hosts": [],
+                "verifier_network_mode": "no-network",
+                "secret_transport": "host_environment",
+                "delete": True,
+                "mounts": [],
+            },
         },
         "cleanup.json": {
             "status": "confirmed",
+            "resource_identifiers": ["trial__env"],
+            "remaining_resource_ids": [],
             "project_identifiers": ["trial__env"],
             "compose_project_labels": ["trial__env"],
             "remaining_container_ids": [],
@@ -495,6 +523,14 @@ def test_harbor_bundle_projects_to_reviewer_safe_blindbench_v1(tmp_path: Path) -
     assert "hidden-host-id" not in serialized
     assert "hidden-project" not in serialized
     assert str(tmp_path) not in serialized
+
+    (bundle / "environment.json").write_text(
+        json.dumps({"schema_version": "1", "provider": "daytona"}),
+        encoding="utf-8",
+    )
+    export_run(run_dir)
+    daytona_record = json.loads(json_path.read_text(encoding="utf-8"))["records"][0]
+    assert daytona_record["environment"] == "harbor/isolated-sandbox"
 
 
 def test_harbor_export_rejects_symlink_components_and_malformed_run(tmp_path: Path) -> None:

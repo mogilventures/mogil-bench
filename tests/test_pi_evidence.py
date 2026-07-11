@@ -390,6 +390,31 @@ def test_evidence_projection_redacts_sensitive_data_and_validates_jsonl(tmp_path
         analysis_metadata={"provider": "secret-provider", "model": "secret-model"},
         termination_reason="completed",
     )
+    assert artifact.reviewer.environment_class == "docker"
+    (bundle / "environment.json").write_text(
+        json.dumps({"schema_version": "1", "provider": "daytona"}),
+        encoding="utf-8",
+    )
+    daytona_artifact = build_harbor_evidence(
+        bundle,
+        run_id="run-daytona",
+        attempt_id="attempt-daytona",
+        task={
+            "id": "task",
+            "revision": "1",
+            "privacy_class": "public",
+            "prompt": "Fix /root/private",
+        },
+        outcomes={
+            "process": "succeeded",
+            "verifier": "passed",
+            "infrastructure": "succeeded",
+            "evidence_completeness": "complete",
+        },
+        analysis_metadata={"provider": "secret-provider", "model": "secret-model"},
+        termination_reason="completed",
+    )
+    assert daytona_artifact.reviewer.environment_class == "isolated-sandbox"
     path = tmp_path / "evidence.json"
     path.write_text(artifact.model_dump_json())
     assert validate_evidence_artifact(path) == 1
