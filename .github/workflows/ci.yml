@@ -18,7 +18,9 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e '.[dev]'
+      # Conformance tests instantiate Harbor's real Daytona adapter against
+      # provider doubles, so install the reviewed optional SDK in this job.
+      - run: python -m pip install -e '.[dev,daytona]'
       - run: pytest -q -m "not docker_smoke"
       - run: ruff check .
       - run: mypy
