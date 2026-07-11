@@ -8,7 +8,12 @@ import yaml
 from pydantic import ValidationError
 from typer.testing import CliRunner
 
-from mogil_bench.artifacts import ArtifactError, upload_artifact, validate_artifact
+from mogil_bench.artifacts import (
+    ArtifactError,
+    upload_artifact,
+    validate_artifact,
+    validate_ingest_counts,
+)
 from mogil_bench.cli import app
 from mogil_bench.models import Pack, PrivacyClass
 from mogil_bench.packs import PackError, load_pack
@@ -314,6 +319,32 @@ def test_upload_is_dry_run_and_endpoint_is_guarded(tmp_path: Path) -> None:
     )
     with pytest.raises(ArtifactError, match="endpoint"):
         upload_artifact(artifact, "https://example.com/ingest/v1/traces", "", confirm=False)
+
+
+def test_ingest_counts_reject_partial_or_truncated_success() -> None:
+    complete = {
+        "traces": 2,
+        "imported": 1,
+        "deduped": 1,
+        "steps": 4,
+        "requestMissing": 0,
+        "responseMissing": 0,
+        "invalid": 0,
+        "truncated": False,
+    }
+    assert validate_ingest_counts(complete, 2)["deduped"] == 1
+
+    invalid = {**complete, "imported": 0, "invalid": 1}
+    with pytest.raises(ArtifactError, match="invalid"):
+        validate_ingest_counts(invalid, 2)
+
+    truncated = {**complete, "truncated": True}
+    with pytest.raises(ArtifactError, match="truncated"):
+        validate_ingest_counts(truncated, 2)
+
+    partial = {**complete, "imported": 0, "deduped": 1}
+    with pytest.raises(ArtifactError, match="accepted 1 of 2"):
+        validate_ingest_counts(partial, 2)
 
 
 def test_cli_end_to_end_smoke(tmp_path: Path) -> None:

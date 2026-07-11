@@ -104,11 +104,41 @@ def validate_endpoint(endpoint: str) -> None:
         )
 
 
+def validate_ingest_counts(payload: Any, expected_records: int) -> dict[str, Any]:
+    """Validate BlindBench's counts-only response before calling an upload successful."""
+    if not isinstance(payload, dict):
+        raise ArtifactError("BlindBench returned an invalid counts response")
+    allowed = {
+        "traces",
+        "imported",
+        "deduped",
+        "steps",
+        "requestMissing",
+        "responseMissing",
+        "invalid",
+        "truncated",
+    }
+    counts = {key: payload[key] for key in allowed if key in payload}
+    required = {"imported", "deduped", "invalid", "truncated"}
+    if not required.issubset(counts):
+        raise ArtifactError("BlindBench counts response is missing required fields")
+    if counts["invalid"] != 0:
+        raise ArtifactError(f"BlindBench rejected {counts['invalid']} record(s) as invalid")
+    if counts["truncated"] is not False:
+        raise ArtifactError("BlindBench truncated the ingest batch; resend the unprocessed suffix")
+    accepted = counts["imported"] + counts["deduped"]
+    if accepted != expected_records:
+        raise ArtifactError(
+            f"BlindBench accepted {accepted} of {expected_records} intended record(s)"
+        )
+    return counts
+
+
 def upload_artifact(
     path: Path, endpoint: str, token: str, *, confirm: bool
 ) -> dict[str, Any] | None:
     validate_endpoint(endpoint)
-    validate_artifact(path)
+    expected_records = validate_artifact(path)
     if not confirm:
         return None
     if not token:
@@ -131,16 +161,4 @@ def upload_artifact(
             payload: Any = json.loads(response.read())
     except (HTTPError, URLError, json.JSONDecodeError) as error:
         raise ArtifactError(f"BlindBench upload failed: {type(error).__name__}") from error
-    if not isinstance(payload, dict):
-        raise ArtifactError("BlindBench returned an invalid counts response")
-    allowed = {
-        "traces",
-        "imported",
-        "deduped",
-        "steps",
-        "requestMissing",
-        "responseMissing",
-        "invalid",
-        "truncated",
-    }
-    return {key: payload[key] for key in allowed if key in payload}
+    return validate_ingest_counts(payload, expected_records)

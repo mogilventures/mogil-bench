@@ -78,7 +78,7 @@ mogil-bench artifact upload /tmp/mogil-sample-run/blindbench.json \
   --endpoint https://DEPLOYMENT.convex.site/ingest/v1/traces
 ```
 
-A real upload additionally requires `BLINDBENCH_INGEST_TOKEN` and `--confirm`. Only HTTPS `*.convex.site/ingest/v1/traces` endpoints are accepted. The CLI never prints the token or record content and reports only response counts. Tests make no network calls.
+A real upload additionally requires `BLINDBENCH_INGEST_TOKEN` and `--confirm`. Only HTTPS `*.convex.site/ingest/v1/traces` endpoints are accepted. The CLI never prints the token or record content and reports only response counts. It treats `invalid > 0`, `truncated: true`, a malformed counts response, or an imported-plus-deduped count that differs from the intended batch size as an upload failure. Tests make no network calls.
 
 Prompts and outputs are reviewer-visible and free text is not automatically scrubbed by BlindBench. Never benchmark secrets or customer data; set `privacy_class` accurately. Hidden verifier expectations are not exported.
 
