@@ -10,7 +10,7 @@ from urllib.request import Request, urlopen
 
 from pydantic import ValidationError
 
-from .models import BlindBenchBatch
+from .models import BlindBenchBatch, HarborRunRecord
 
 
 class ArtifactError(ValueError):
@@ -24,10 +24,85 @@ def _read_json(path: Path) -> Any:
         raise ArtifactError(f"cannot read JSON {path}: {error}") from error
 
 
+def _reject_symlink_components(path: Path) -> None:
+    absolute = path.absolute()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink():
+            raise ArtifactError(f"path component must not be a symlink: {current.name}")
+
+
+def _strict_bundle_path(run_dir: Path, bundle_reference: object) -> tuple[Path, Path]:
+    if not isinstance(bundle_reference, str):
+        raise ArtifactError("Harbor bundle reference must be a string")
+    reference = Path(bundle_reference)
+    if reference.is_absolute() or not reference.parts or any(
+        part in {"", ".", ".."} for part in reference.parts
+    ):
+        raise ArtifactError("Harbor bundle reference must be a safe relative path")
+    _reject_symlink_components(run_dir)
+    try:
+        root = run_dir.resolve(strict=True)
+        current = run_dir
+        for part in reference.parts:
+            current = current / part
+            if current.is_symlink():
+                raise ArtifactError("Harbor bundle path must not contain symlinks")
+        bundle = current.resolve(strict=True)
+    except OSError as error:
+        raise ArtifactError("Harbor bundle path cannot be resolved") from error
+    if not bundle.is_relative_to(root):
+        raise ArtifactError("Harbor bundle path escapes run root")
+    return reference, bundle
+
+
+def _harbor_record(
+    run_dir: Path, manifest: dict[str, Any], summary: dict[str, Any]
+) -> dict[str, Any]:
+    reference, bundle = _strict_bundle_path(run_dir, summary["bundle"])
+    try:
+        run = HarborRunRecord.model_validate(_read_json(bundle / "run.json"))
+    except ValidationError as error:
+        raise ArtifactError(f"invalid Mogil Harbor run.json: {error}") from error
+    metadata = {
+        "pack_id": manifest["pack"]["id"],
+        "pack_revision": manifest["pack"]["revision"],
+        "pack_fingerprint": manifest["pack"]["fingerprint"],
+        "task_id": summary["task_id"],
+        "configuration_id": summary["configuration_id"],
+        "category": summary["category"],
+        "attempt_id": run.attempt_id,
+        "bundle_reference": reference.as_posix(),
+        "evidence_status": run.evidence_status.value,
+        "agent_outcome": run.agent_outcome.value,
+        "verifier_outcome": run.verifier_outcome.value,
+        "infrastructure_outcome": run.infrastructure_outcome.value,
+    }
+    return {
+        "version": "1",
+        "id": summary["id"],
+        "timestamp": manifest["created_at"],
+        "model": summary["model"],
+        "provider": summary["provider"],
+        "input": {"messages": [{"role": "user", "content": summary["prompt"]}]},
+        "output": None,
+        "product": "mogil-bench",
+        "module": summary["lane"],
+        "environment": "harbor/docker",
+        "harness": summary["harness"],
+        "metadata": metadata,
+        "privacy_class": summary["privacy_class"],
+    }
+
+
 def export_run(run_dir: Path) -> tuple[Path, Path]:
     manifest = _read_json(run_dir / "manifest.json")
     records: list[dict[str, Any]] = []
     for summary in manifest["results"]:
+        if "bundle" in summary:
+            records.append(_harbor_record(run_dir, manifest, summary))
+            continue
         raw = _read_json(run_dir / summary["raw_artifact"])
         execution = raw["execution"]
         records.append(
@@ -54,6 +129,7 @@ def export_run(run_dir: Path) -> tuple[Path, Path]:
                     "status": execution["status"],
                     "output_truncated": execution["output_truncated"],
                     "verification_passed": execution["verification_passed"],
+                    "evidence_status": "non_quality",
                 },
                 "privacy_class": raw["privacy_class"],
             }

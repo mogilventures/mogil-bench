@@ -80,7 +80,14 @@ def run(
             allow_commands=allow_commands,
             allow_agents=allow_agents,
         )
-    except (PackError, PermissionError, FileExistsError, OSError) as error:
+    except (
+        PackError,
+        PermissionError,
+        FileExistsError,
+        OSError,
+        ValueError,
+        RuntimeError,
+    ) as error:
         _fail(str(error))
     typer.echo(f"run written to {destination}")
 

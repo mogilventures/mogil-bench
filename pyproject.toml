@@ -7,9 +7,10 @@ name = "mogil-bench"
 version = "0.1.0"
 description = "Safe local benchmark runner and BlindBench artifact exporter"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.13"
 license = {text = "MIT"}
 dependencies = [
+  "harbor==0.18.0",
   "pydantic>=2.7,<3",
   "PyYAML>=6.0,<7",
   "typer>=0.12,<1",
@@ -31,15 +32,16 @@ packages = ["src/mogil_bench"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["docker_smoke: real mandatory Harbor and local Docker integration"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 packages = ["mogil_bench"]

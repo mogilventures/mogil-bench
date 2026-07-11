@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from .models import Pack, Task
+from .models import Configuration, Pack, Task
 
 
 class PackError(ValueError):
@@ -58,6 +58,23 @@ def task_prompt(pack_path: Path, task: Task) -> str:
     return "\n\n".join(parts)
 
 
+def configuration_identity_v1(config: Configuration) -> dict[str, Any]:
+    """Return the immutable v1 identity shape, preserving pre-Harbor IDs."""
+    value = config.model_dump(mode="json")
+    if config.adapter != "harbor":
+        for field in ("backend", "environment_type", "mounts"):
+            value.pop(field, None)
+    return value
+
+
+def pack_identity_v1(pack: Pack) -> dict[str, Any]:
+    value = pack.model_dump(mode="json")
+    value["configurations"] = [
+        configuration_identity_v1(config) for config in pack.configurations
+    ]
+    return value
+
+
 def pack_fingerprint(pack_path: Path, pack: Pack) -> str:
     fixture_hashes: dict[str, str] = {}
     for task in pack.tasks:
@@ -72,4 +89,4 @@ def pack_fingerprint(pack_path: Path, pack: Pack) -> str:
         for item in files:
             key = f"{task.id}/{item.relative_to(fixture) if fixture.is_dir() else fixture.name}"
             fixture_hashes[key] = hashlib.sha256(item.read_bytes()).hexdigest()
-    return canonical_hash({"pack": pack.model_dump(mode="json"), "fixtures": fixture_hashes})
+    return canonical_hash({"pack": pack_identity_v1(pack), "fixtures": fixture_hashes})

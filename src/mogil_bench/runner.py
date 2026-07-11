@@ -1,18 +1,35 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 import os
+import secrets
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol
+from uuid import uuid4
+
+if TYPE_CHECKING:
+    from .harbor_backend import HarborAttemptResult
+    from .harbor_tasks import HarborTranslation
+    from .models import AttemptIdentity
 
 from .models import Configuration, Task
-from .packs import canonical_hash, pack_fingerprint, resolve_fixture, task_prompt
+from .packs import (
+    canonical_hash,
+    configuration_identity_v1,
+    pack_fingerprint,
+    resolve_fixture,
+    task_prompt,
+)
 
 MAX_OUTPUT_BYTES = 32_768
 PI_EXECUTABLE_ENV = "MOGIL_BENCH_PI_EXECUTABLE"
@@ -59,6 +76,17 @@ class Execution:
     error: str | None = None
 
 
+class _HarborBackend(Protocol):
+    async def run_attempt(
+        self,
+        translation: HarborTranslation,
+        identity: AttemptIdentity,
+        output_root: Path,
+        *,
+        _fixture_profile: object | None = None,
+    ) -> HarborAttemptResult: ...
+
+
 @dataclass(frozen=True)
 class RunResult:
     id: str
@@ -72,6 +100,22 @@ class RunResult:
     harness: dict[str, Any]
     prompt: str
     execution: Execution
+
+
+def _fixture_profile_token() -> object:
+    from .harbor_backend import _FIXTURE_PROFILE_TOKEN
+
+    return _FIXTURE_PROFILE_TOKEN
+
+
+def logical_run_id(fingerprint: str, task: Task, config: Configuration) -> str:
+    return "mogil-" + canonical_hash(
+        {
+            "pack_fingerprint": fingerprint,
+            "task": task.model_dump(mode="json"),
+            "configuration": configuration_identity_v1(config),
+        }
+    )
 
 
 def _bounded(data: bytes) -> tuple[str, bool]:
@@ -281,12 +325,19 @@ def _pi(pack_path: Path, task: Task, config: Configuration, prompt: str) -> Exec
         )
 
 
-def run_pack(
+def _run_pack_to_directory(
     pack_path: Path,
     output_dir: Path,
     *,
+    final_output_dir: Path,
     allow_commands: bool = False,
     allow_agents: bool = False,
+    harbor_backend: _HarborBackend | None = None,
+    harbor_preflight: Callable[[Path, HarborTranslation], None] | None = None,
+    host_pi: Callable[[Path, Task, Configuration, str], Execution] = _pi,
+    attempt_id_factory: Callable[[], object] | None = None,
+    canary_factory: Callable[[], str] | None = None,
+    _test_agent_import_path: str | None = None,
 ) -> Path:
     from .packs import load_pack
 
@@ -294,8 +345,94 @@ def run_pack(
     fingerprint = pack_fingerprint(pack_path, pack)
     if any(config.adapter == "command" for config in pack.configurations) and not allow_commands:
         raise PermissionError("command configurations require --allow-commands acknowledgement")
-    if any(config.adapter == "pi" for config in pack.configurations) and not allow_agents:
-        raise PermissionError("pi configurations require --allow-agents acknowledgement")
+    agent_configs = [config for config in pack.configurations if config.adapter in {"pi", "harbor"}]
+    if agent_configs and not allow_agents:
+        raise PermissionError("pi and harbor configurations require --allow-agents acknowledgement")
+    harbor_configs = [config for config in pack.configurations if config.adapter == "harbor"]
+    if harbor_configs:
+        if len(pack.tasks) != 1 or len(pack.configurations) != 1:
+            raise ValueError("Phase 1 Harbor runs require exactly one task and one configuration")
+        from .harbor_backend import HarborBackend, preflight
+        from .harbor_tasks import translate_harbor_task
+        from .models import create_attempt_identity
+
+        task = pack.tasks[0]
+        config = harbor_configs[0]
+        result_id = logical_run_id(fingerprint, task, config)
+        identity = create_attempt_identity(
+            result_id,
+            attempt_id_factory=attempt_id_factory or uuid4,
+        )
+        fixture = resolve_fixture(pack_path, task)
+        verifier_template = fixture / "verify.py" if fixture.is_dir() else None
+        if verifier_template is None or not verifier_template.is_file():
+            raise ValueError("Harbor tasks require a hidden verify.py beside the candidate fixture")
+        with tempfile.TemporaryDirectory(prefix="mogil-harbor-translation-") as temporary:
+            temporary_root = Path(temporary)
+            canary = (canary_factory or (
+                lambda: "HIDDEN_VERIFIER_CANARY_" + secrets.token_hex(16)
+            ))()
+            hidden_verifier = temporary_root / "hidden-verify.py"
+            hidden_verifier.write_text(
+                verifier_template.read_text(encoding="utf-8").replace("__CANARY__", canary),
+                encoding="utf-8",
+            )
+            translation = translate_harbor_task(
+                pack_path,
+                task,
+                config,
+                identity,
+                temporary_root / "translation",
+                hidden_verifier=hidden_verifier,
+                test_agent_import_path=_test_agent_import_path,
+            )
+            (harbor_preflight or preflight)(final_output_dir, translation)
+            output_dir.mkdir(parents=True, exist_ok=False)
+            (output_dir / "results").mkdir()
+            backend = harbor_backend or HarborBackend()
+            attempt = asyncio.run(
+                backend.run_attempt(
+                    translation,
+                    identity,
+                    output_dir / "results",
+                    _fixture_profile=(
+                        _fixture_profile_token() if _test_agent_import_path is not None else None
+                    ),
+                )
+            )
+            bundle_dir = attempt.bundle_dir
+            run = attempt.run
+            created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+            summary = {
+                "id": result_id,
+                "task_id": task.id,
+                "configuration_id": config.id,
+                "category": task.category,
+                "lane": task.lane.value,
+                "privacy_class": task.privacy_class.value,
+                "provider": config.provider,
+                "model": config.model,
+                "harness": config.harness.model_dump(exclude_none=True),
+                "prompt": (translation.task_dir / "instruction.md").read_text(
+                    encoding="utf-8"
+                ).rstrip("\n"),
+                "status": run["infrastructure_outcome"],
+                "bundle": bundle_dir.relative_to(output_dir).as_posix(),
+            }
+            manifest = {
+                "schema_version": "1",
+                "created_at": created_at,
+                "pack": {"id": pack.id, "revision": pack.revision, "fingerprint": fingerprint},
+                "result_count": 1,
+                "results": [summary],
+            }
+            (output_dir / "manifest.json").write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            from .artifacts import export_run
+
+            export_run(output_dir)
+            return output_dir
     output_dir.mkdir(parents=True, exist_ok=False)
     raw_dir = output_dir / "results"
     raw_dir.mkdir()
@@ -304,19 +441,13 @@ def run_pack(
     for task in pack.tasks:
         prompt = task_prompt(pack_path, task)
         for config in pack.configurations:
-            result_id = "mogil-" + canonical_hash(
-                {
-                    "pack_fingerprint": fingerprint,
-                    "task": task.model_dump(mode="json"),
-                    "configuration": config.model_dump(mode="json"),
-                }
-            )
+            result_id = logical_run_id(fingerprint, task, config)
             if config.adapter == "mock":
                 execution = _mock(prompt, task)
             elif config.adapter == "command":
                 execution = _command(pack_path, task)
             else:
-                execution = _pi(pack_path, task, config, prompt)
+                execution = host_pi(pack_path, task, config, prompt)
             result = RunResult(
                 id=result_id,
                 task_id=task.id,
@@ -357,3 +488,106 @@ def run_pack(
 
     export_run(output_dir)
     return output_dir
+
+
+def _atomic_run(
+    pack_path: Path,
+    output_dir: Path,
+    **kwargs: Any,
+) -> Path:
+    if output_dir.exists():
+        raise FileExistsError(f"output path already exists: {output_dir}")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging_root = Path(
+        tempfile.mkdtemp(prefix=f".{output_dir.name}.staging-", dir=output_dir.parent)
+    )
+    staging = staging_root / "complete"
+    try:
+        _run_pack_to_directory(
+            pack_path,
+            staging,
+            final_output_dir=output_dir,
+            **kwargs,
+        )
+        staging.replace(output_dir)
+        staging_root.rmdir()
+        return output_dir
+    except BaseException:
+        shutil.rmtree(staging_root, ignore_errors=True)
+        raise
+
+
+_SHIPPED_FIXTURE_FINGERPRINT = (
+    "856415e01003df1ae8461f2bff251fd040c25e2dd9d0c3079531a8ce02c10317"
+)
+_SHIPPED_FIXTURE_HASHES = {
+    "agent.py": "e4310f9e2fb61b11040b5e2d3bbcf5cf4ad070f467a30887c1871d32e09e506c",
+    "calculator.py": "405aaadb887d880ae2e13d576ebd4524dd12a001bf832d778a05d243779dafcc",
+    "verify.py": "07f5cc0e302a62a5f99863034abb1c3fb03756daa27c82178522a86e684c0455",
+}
+_SHIPPED_FIXTURE_AGENT = "agent:DeterministicTestAgent"
+_SHIPPED_FIXTURE_AGENT_VERSION = "test-only-1"
+
+
+def _run_shipped_fixture_pack(
+    pack_path: Path,
+    output_dir: Path,
+    *,
+    canary_factory: Callable[[], str] | None = None,
+) -> Path:
+    """Run only the source-bound, credential-free repository smoke fixture."""
+    from .packs import load_pack
+
+    pack = load_pack(pack_path)
+    fingerprint = pack_fingerprint(pack_path, pack)
+    if fingerprint != _SHIPPED_FIXTURE_FINGERPRINT or len(pack.tasks) != 1:
+        raise ValueError("pack is not the immutable shipped Harbor fixture profile")
+    fixture = resolve_fixture(pack_path, pack.tasks[0])
+    actual_hashes = {
+        name: hashlib.sha256((fixture / name).read_bytes()).hexdigest()
+        for name in _SHIPPED_FIXTURE_HASHES
+    }
+    agent_source = (fixture / "agent.py").read_text(encoding="utf-8")
+    if (
+        actual_hashes != _SHIPPED_FIXTURE_HASHES
+        or f'return "{_SHIPPED_FIXTURE_AGENT_VERSION}"' not in agent_source
+    ):
+        raise ValueError("shipped Harbor fixture source hash or version mismatch")
+    previous_bytecode_setting = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        return _atomic_run(
+            pack_path,
+            output_dir,
+            allow_agents=True,
+            canary_factory=canary_factory,
+            _test_agent_import_path=_SHIPPED_FIXTURE_AGENT,
+        )
+    finally:
+        sys.dont_write_bytecode = previous_bytecode_setting
+
+
+def run_pack(
+    pack_path: Path,
+    output_dir: Path,
+    *,
+    allow_commands: bool = False,
+    allow_agents: bool = False,
+    harbor_backend: _HarborBackend | None = None,
+    harbor_preflight: Callable[[Path, HarborTranslation], None] | None = None,
+    host_pi: Callable[[Path, Task, Configuration, str], Execution] = _pi,
+    attempt_id_factory: Callable[[], object] | None = None,
+    canary_factory: Callable[[], str] | None = None,
+) -> Path:
+    """Build a complete run privately and publish it with one atomic rename."""
+    return _atomic_run(
+        pack_path,
+        output_dir,
+        allow_commands=allow_commands,
+        allow_agents=allow_agents,
+        harbor_backend=harbor_backend,
+        harbor_preflight=harbor_preflight,
+        host_pi=host_pi,
+        attempt_id_factory=attempt_id_factory,
+        canary_factory=canary_factory,
+    )
