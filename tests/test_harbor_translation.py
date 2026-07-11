@@ -12,6 +12,7 @@ from harbor.models.trial.config import EnvironmentConfig as HarborEnvironmentCon
 from harbor.models.trial.config import TaskConfig as HarborTrialTaskConfig
 
 from mogil_bench.harbor_backend import PI_VERSION
+from mogil_bench.harbor_pi import HARBOR_PI_IMPORT_PATH
 from mogil_bench.harbor_tasks import translate_harbor_task
 from mogil_bench.models import Configuration, Harness, Task, create_attempt_identity
 
@@ -118,7 +119,8 @@ def test_translation_builds_harbor_1_3_task_and_pinned_job(tmp_path: Path) -> No
     assert harbor_job.environment.delete is True
     assert harbor_job.environment.mounts == []
     assert len(harbor_job.tasks) == len(harbor_job.agents) == 1
-    assert harbor_job.agents[0].name == "pi"
+    assert harbor_job.agents[0].name is None
+    assert harbor_job.agents[0].import_path == HARBOR_PI_IMPORT_PATH
     assert harbor_job.agents[0].model_name == "anthropic/claude-test"
     assert harbor_job.agents[0].kwargs == {"version": PI_VERSION}
 

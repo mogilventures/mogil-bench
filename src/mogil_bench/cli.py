@@ -8,16 +8,23 @@ from typing import Annotated
 import typer
 
 from .artifacts import ArtifactError, export_run, upload_artifact, validate_artifact
+from .evidence import (
+    EvidenceError,
+    upload_evidence_artifact,
+    validate_evidence_artifact,
+)
 from .packs import PackError, load_pack, pack_fingerprint
 from .runner import run_pack
 
 app = typer.Typer(help="Run safe local benchmark packs and emit BlindBench artifacts.")
 pack_app = typer.Typer(help="Inspect and validate benchmark packs.")
 artifact_app = typer.Typer(help="Validate or upload BlindBench artifacts.")
+evidence_app = typer.Typer(help="Validate or upload mogil.harbor-evidence artifacts.")
 export_app = typer.Typer(help="Export run artifacts.")
 app.add_typer(pack_app, name="pack")
 app.add_typer(export_app, name="export")
 app.add_typer(artifact_app, name="artifact")
+app.add_typer(evidence_app, name="evidence")
 
 
 def _fail(message: str) -> None:
@@ -125,6 +132,36 @@ def artifact_upload(
     try:
         counts = upload_artifact(path, endpoint, token, confirm=confirm)
     except ArtifactError as error:
+        _fail(str(error))
+    if counts is None:
+        typer.echo("dry-run valid; no network request made (pass --confirm to upload)")
+    else:
+        typer.echo(
+            "upload counts: " + ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))
+        )
+
+
+@evidence_app.command("validate")
+def evidence_validate(path: Path) -> None:
+    """Strictly validate mogil.harbor-evidence v1.0 JSON or JSONL."""
+    try:
+        count = validate_evidence_artifact(path)
+    except EvidenceError as error:
+        _fail(str(error))
+    typer.echo(f"valid mogil.harbor-evidence v1.0 artifact: {count} run(s)")
+
+
+@evidence_app.command("upload")
+def evidence_upload(
+    path: Path,
+    endpoint: Annotated[str, typer.Option("--endpoint")],
+    confirm: Annotated[bool, typer.Option("--confirm")] = False,
+) -> None:
+    """Dry-run or upload evidence using a project Automation token."""
+    token = os.environ.get("BLINDBENCH_AUTOMATION_TOKEN", "")
+    try:
+        counts = upload_evidence_artifact(path, endpoint, token, confirm=confirm)
+    except EvidenceError as error:
         _fail(str(error))
     if counts is None:
         typer.echo("dry-run valid; no network request made (pass --confirm to upload)")

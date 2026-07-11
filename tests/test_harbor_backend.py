@@ -555,7 +555,9 @@ def test_cleanup_failure_changes_infrastructure_and_evidence(tmp_path: Path) -> 
     assert result.evidence_status == EvidenceStatus.INSUFFICIENT
 
 
-def test_runner_dispatches_one_harbor_attempt_without_host_pi(tmp_path: Path) -> None:
+def test_runner_dispatches_harbor_tasks_as_independent_attempts_without_host_pi(
+    tmp_path: Path,
+) -> None:
     fixture = tmp_path / "harbor-coding-task"
     fixture.mkdir()
     for name in ("calculator.py", "verify.py", "agent.py"):
@@ -573,6 +575,14 @@ tasks:
     category: coding
     lane: pi-coding
     prompt: Fix the calculator.
+    fixture: harbor-coding-task
+    verifier:
+      argv: [python, /tests/hidden_verify.py, /workspace]
+      stdout_contains: fixture passed
+  - id: calculator-second
+    category: coding
+    lane: pi-coding
+    prompt: Fix it independently.
     fixture: harbor-coding-task
     verifier:
       argv: [python, /tests/hidden_verify.py, /workspace]
@@ -621,6 +631,7 @@ configurations:
     def forbidden_host_pi(*_args: object) -> Any:
         raise AssertionError("host Pi must not run for Harbor")
 
+    attempt_ids = iter(("attempt-one", "attempt-two"))
     run_dir = run_pack(
         pack_path,
         tmp_path / "run",
@@ -628,21 +639,27 @@ configurations:
         harbor_backend=FakeBackend(),
         harbor_preflight=checked_preflight,
         host_pi=forbidden_host_pi,
-        attempt_id_factory=lambda: "attempt-one",
+        attempt_id_factory=lambda: next(attempt_ids),
     )
 
-    assert calls == ["preflight", "backend"]
+    assert calls == ["preflight", "preflight", "backend", "backend"]
     manifest = json.loads((run_dir / "manifest.json").read_text())
-    assert manifest["result_count"] == 1
-    assert manifest["results"][0]["bundle"].endswith("/attempt-one")
-    assert validate_artifact(run_dir / "blindbench.json") == 1
+    assert manifest["result_count"] == 2
+    assert [Path(item["bundle"]).name for item in manifest["results"]] == [
+        "attempt-one",
+        "attempt-two",
+    ]
+    assert validate_artifact(run_dir / "blindbench.json") == 2
 
 
-def test_phase_one_evidence_states_exclude_quality_eligible() -> None:
+def test_issue_six_adds_quality_eligible_without_changing_fixture_state() -> None:
     assert {state.value for state in EvidenceStatus} == {
         "non_quality",
         "insufficient",
         "fixture_complete",
+        "quality_eligible",
     }
-    with pytest.raises(ValidationError):
+    assert (
         TypeAdapter(EvidenceStatus).validate_python("quality_eligible")
+        is EvidenceStatus.QUALITY_ELIGIBLE
+    )

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .harbor_backend import PI_VERSION
+from .harbor_pi import HARBOR_PI_IMPORT_PATH
 from .models import AttemptIdentity, Configuration, Task
 from .packs import resolve_fixture
 
@@ -266,14 +267,13 @@ def translate_harbor_task(
 
     test_agent = test_agent_import_path is not None
     agent_config: dict[str, object] = {
-        "name": None if test_agent else "pi",
+        "name": None,
         "model_name": f"{config.provider}/{config.model}",
         "n_concurrent": 1,
         "override_timeout_sec": task.timeout_seconds,
         "kwargs": {"test_only": True} if test_agent else {"version": PI_VERSION},
     }
-    if test_agent_import_path is not None:
-        agent_config["import_path"] = test_agent_import_path
+    agent_config["import_path"] = test_agent_import_path or HARBOR_PI_IMPORT_PATH
     agent_network = "no-network" if test_agent else "public"
     (task_dir / "task.toml").write_text(
         _task_toml(task, agent_network=agent_network), encoding="utf-8"

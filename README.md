@@ -4,7 +4,7 @@ Mogil Bench v1 is a local Python CLI for running versioned, real-work-like bench
 
 ## Install
 
-Python 3.12.x and a running local Docker daemon are required for Harbor runs. Mogil Bench pins `harbor==0.18.0`; Harbor's container-side Pi adapter is pinned to `@mariozechner/pi-coding-agent@0.80.6`. The mock and guarded command examples do not require Docker.
+Python 3.12.x and a running local Docker daemon are required for Harbor runs. Mogil Bench pins `harbor==0.18.0`; Harbor's container-side Pi adapter is pinned to `@mariozechner/pi-coding-agent@0.80.6`. Because the original npm scope does not publish 0.80.6 and the release moved to the `@earendil-works` scope, Mogil's narrow Harbor Pi subclass installs that exact 0.80.6 distribution through npm package-alias syntax while preserving Harbor orchestration, runtime behavior, raw JSONL capture, and the reviewed package/version boundary. It does not read or copy host auth files. The mock and guarded command examples do not require Docker.
 
 ```bash
 python -m venv .venv
@@ -61,7 +61,7 @@ mogil-bench run path/to/reviewed-pi-pack.yaml \
 
 The adapter resolves `pi` from `PATH`, or an absolute executable path named `pi` from `MOGIL_BENCH_PI_EXECUTABLE` (primarily for controlled testing). It invokes Pi directly with `--print`, `--no-session`, the configuration's `--provider` and `--model`, only the `read,write,edit` built-in tools, and a fixed benchmark system prompt that directs work to the temporary directory. It disables extensions, skills, prompt templates, context files, project approval, update checks, and telemetry. Known provider API-key variables and an explicitly set `PI_CODING_AGENT_DIR` are passed without being logged.
 
-V1 captures Pi's final stdout plus bounded stderr/status/duration; it does not normalize Pi's JSON event stream, tool-call trajectory, authoritative token usage, or provider cost. Those are follow-up work. Provider/model/harness fields in exported records are the same configuration values used for invocation.
+The legacy host adapter still captures only final stdout. Harbor Pi runs instead retain `pi.txt` byte-for-byte and strictly normalize its JSONL as described below.
 
 ## Harbor Docker foundation
 
@@ -85,15 +85,18 @@ verifier/{stdout,stderr}.txt
 artifacts/harbor-manifest.json
 ```
 
-`agent/pi.txt` is preserved byte-for-byte. For real Pi it is labeled `raw_filtered_pi_events`: Harbor 0.18.0 filters `message_update`, so this is neither a complete trajectory nor ATIF. `checksums.sha256` covers every other retained file.
+`agent/pi.txt` is preserved byte-for-byte. Harbor 0.18.0 filters incremental `message_update` records, but retains finalized `message_end`, tool lifecycle, `agent_end`, and Pi 0.80.6's final `agent_settled` record. Mogil parses only that pinned shape, requires a newline-terminated JSON object on every line, validates message/tool/lifecycle linkage, requires exactly one in-order `agent_settled` after `agent_end`, and fails closed if a stream is malformed, truncated, unsupported, missing final output, or incomplete. Pi numeric message timestamps are epoch milliseconds (`Date.now()`); they are normalized to timezone-aware UTC ISO-8601 strings. ISO string timestamps are parsed and normalized as UTC, epoch seconds remain accepted for older emitters, and invalid or non-monotonic timestamps fail closed. Event timestamps are omitted only when the corresponding retained Pi event genuinely has none. Assistant `stopReason` is preserved. Exactly one terminal assistant text response with `stopReason: "stop"` must follow all linked tool evidence; pre-tool commentary and `toolUse` responses can never become final output. Stable canonical events explicitly distinguish messages, reasoning, tool calls/results/errors, final output, and termination. Raw bytes remain separate and hashed.
 
-Evidence status is closed in Phase 1:
+A complete real Pi attempt additionally writes `mogil.harbor-evidence.json` and `.jsonl`. Both use strict schema `mogil.harbor-evidence` version `1.0`; JSONL contains one complete run per line. The private envelope retains analysis-only provider/model metadata. Its `reviewer` projection omits provenance and redacts credentials, host/workspace paths, verifier canaries, and hidden verifier details. Patch and verifier streams are bounded and carry integrity references. Every reviewer-inline reference requires both `sha256` for the immutable retained raw artifact and `reviewer_sha256` for the exact sanitized inline UTF-8 value. Patch/stdout/stderr hash their exact strings; changed files hash canonical JSON (`sort_keys`, compact separators, UTF-8). Consumers must verify `reviewer_sha256` even when inline content contains `[REDACTED]` or path-redaction markers, while keeping raw `sha256` values and paths private from guests.
+
+Evidence states are:
 
 - `non_quality`: mock, command, and legacy final-answer-only evidence;
 - `insufficient`: any Harbor attempt with missing/corrupt evidence, failed infrastructure, failed/unconfirmed cleanup, or real Pi evidence pending #6;
-- `fixture_complete`: only the credential-free deterministic fixture with complete artifacts, passing isolated verifier, integrity checks, and confirmed cleanup.
+- `fixture_complete`: only the credential-free deterministic fixture with complete artifacts, passing isolated verifier, integrity checks, and confirmed cleanup;
+- `quality_eligible`: only a real Pi run with successful complete outcomes, all verifier rewards equal to 1, complete linked events, one terminal `stop` final output, completed termination, canonical chronological run timestamps, trusted workspace/reviewer evidence, valid hashes, and confirmed cleanup.
 
-`quality_eligible` is impossible in this phase. A reward of 1 never overrides missing evidence or cleanup failure.
+A reward of 1 never overrides trajectory, evidence, integrity, or cleanup failure.
 
 Run the mandatory real integration check from the repository root:
 
@@ -120,6 +123,18 @@ Commands are deny-by-default and need **both** `allow_commands: true` in the pac
 
 These are guardrails, not a hardened OS sandbox: an allowed interpreter can run arbitrary code, and Pi's read/write/edit tools are not filesystem-confined by the operating system. Only acknowledge trusted packs and run them in an external sandbox when stronger isolation is required. Production-grade untrusted execution is out of scope.
 
+## Pi activation pack
+
+[`packs/pi-activation-v1.yaml`](packs/pi-activation-v1.yaml) contains three short fictional/public coding tasks with deterministic hidden verifiers and no customer data. The activation model is `anthropic/claude-sonnet-4-6`; provider/model provenance remains private and is omitted from the reviewer projection. One Harbor configuration executes the three tasks as three independent attempts:
+
+```bash
+mogil-bench pack validate packs/pi-activation-v1.yaml
+mogil-bench run packs/pi-activation-v1.yaml \
+  --output-dir /tmp/mogil-pi-activation --allow-agents
+```
+
+Real execution requires a credential supported by Harbor's Pi adapter. Keep verifier sources private; they are copied only into the separate no-network verifier context.
+
 ## BlindBench upload
 
 Upload is dry-run by default and validates both artifact and endpoint without making a request:
@@ -131,11 +146,57 @@ mogil-bench artifact upload /tmp/mogil-sample-run/blindbench.json \
 
 A real upload additionally requires `BLINDBENCH_INGEST_TOKEN` and `--confirm`. Only HTTPS `*.convex.site/ingest/v1/traces` endpoints are accepted. The CLI never prints the token or record content and reports only response counts. It treats `invalid > 0`, `truncated: true`, a malformed counts response, or an imported-plus-deduped count that differs from the intended batch size as an upload failure. Tests make no network calls.
 
-Prompts and outputs are reviewer-visible and free text is not automatically scrubbed by BlindBench. Never benchmark secrets or customer data; set `privacy_class` accurately. Hidden verifier expectations are not exported.
+Prompts and outputs are reviewer-visible and free text is not automatically scrubbed by legacy BlindBench exports. Never benchmark secrets or customer data; set `privacy_class` accurately. Hidden verifier expectations are not exported.
+
+### Run-evidence upload
+
+Validate strict run evidence locally:
+
+```bash
+mogil-bench evidence validate /tmp/mogil-pi-activation/results/RUN/ATTEMPT/mogil.harbor-evidence.json
+mogil-bench evidence validate /tmp/mogil-pi-activation/results/RUN/ATTEMPT/mogil.harbor-evidence.jsonl
+```
+
+Upload is dry-run by default. The public endpoint must be HTTPS (HTTP is accepted only for literal loopback development), have no URL credentials/query/fragment, and use exactly `/ingest/v1/eval-runs`:
+
+```bash
+mogil-bench evidence upload EVIDENCE.json \
+  --endpoint https://blindbench.example/ingest/v1/eval-runs
+BLINDBENCH_AUTOMATION_TOKEN='project-token' mogil-bench evidence upload EVIDENCE.json \
+  --endpoint https://blindbench.example/ingest/v1/eval-runs --confirm
+```
+
+The request body is a bounded batch of complete authoritative Pydantic artifacts, not reviewer projections or legacy trace records:
+
+```json
+{
+  "runs": [
+    {
+      "schema": "mogil.harbor-evidence",
+      "version": "1.0",
+      "run": { "id": "mogil-run-id", "attempt": "attempt-id" },
+      "...": "remaining strict artifact fields"
+    }
+  ]
+}
+```
+
+A successful consumer response uses exactly these completion counters (additional response metadata is ignored):
+
+```json
+{
+  "complete": 3,
+  "imported": 2,
+  "deduped": 1,
+  "invalid": 0
+}
+```
+
+`complete` must equal the submitted `runs` count, `imported + deduped` must equal that same count, and `invalid` must be zero. A conflict or partial batch must not report a complete count. The token is a project Automation token and is never printed. Errors disclose only exception classes, never token, response body, prompts, or outputs.
 
 ## Explicit deferrals
 
-This foundation does not implement #6 Pi event normalization/ATIF or `quality_eligible`, #8 Daytona/remote sandbox lifecycle, BlindBench #354's run-level endpoint/schema, or Fireworks/training export. It also does not add generalized schedulers, retries, pass@k, or concurrency above one.
+This implementation does not add ATIF/OTLP projections, #8 Daytona/remote sandbox lifecycle, BlindBench storage/UI changes, Fireworks/training export, retries, pass@k, or concurrency above one.
 
 ## Development
 

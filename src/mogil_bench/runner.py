@@ -350,81 +350,142 @@ def _run_pack_to_directory(
         raise PermissionError("pi and harbor configurations require --allow-agents acknowledgement")
     harbor_configs = [config for config in pack.configurations if config.adapter == "harbor"]
     if harbor_configs:
-        if len(pack.tasks) != 1 or len(pack.configurations) != 1:
-            raise ValueError("Phase 1 Harbor runs require exactly one task and one configuration")
+        if len(harbor_configs) != 1 or len(pack.configurations) != 1:
+            raise ValueError("Harbor runs require exactly one configuration")
         from .harbor_backend import HarborBackend, preflight
         from .harbor_tasks import translate_harbor_task
         from .models import create_attempt_identity
 
-        task = pack.tasks[0]
         config = harbor_configs[0]
-        result_id = logical_run_id(fingerprint, task, config)
-        identity = create_attempt_identity(
-            result_id,
-            attempt_id_factory=attempt_id_factory or uuid4,
-        )
-        fixture = resolve_fixture(pack_path, task)
-        verifier_template = fixture / "verify.py" if fixture.is_dir() else None
-        if verifier_template is None or not verifier_template.is_file():
-            raise ValueError("Harbor tasks require a hidden verify.py beside the candidate fixture")
         with tempfile.TemporaryDirectory(prefix="mogil-harbor-translation-") as temporary:
             temporary_root = Path(temporary)
-            canary = (canary_factory or (
-                lambda: "HIDDEN_VERIFIER_CANARY_" + secrets.token_hex(16)
-            ))()
-            hidden_verifier = temporary_root / "hidden-verify.py"
-            hidden_verifier.write_text(
-                verifier_template.read_text(encoding="utf-8").replace("__CANARY__", canary),
-                encoding="utf-8",
-            )
-            translation = translate_harbor_task(
-                pack_path,
-                task,
-                config,
-                identity,
-                temporary_root / "translation",
-                hidden_verifier=hidden_verifier,
-                test_agent_import_path=_test_agent_import_path,
-            )
-            (harbor_preflight or preflight)(final_output_dir, translation)
+            prepared: list[tuple[Task, str, Any, Any]] = []
+            for task in pack.tasks:
+                result_id = logical_run_id(fingerprint, task, config)
+                identity = create_attempt_identity(
+                    result_id, attempt_id_factory=attempt_id_factory or uuid4
+                )
+                fixture = resolve_fixture(pack_path, task)
+                verifier_template = fixture / "verify.py" if fixture.is_dir() else None
+                if verifier_template is None or not verifier_template.is_file():
+                    raise ValueError(
+                        "Harbor tasks require a hidden verify.py beside the candidate fixture"
+                    )
+                canary = (
+                    canary_factory or (lambda: "HIDDEN_VERIFIER_CANARY_" + secrets.token_hex(16))
+                )()
+                hidden_verifier = temporary_root / f"hidden-{task.id}-verify.py"
+                hidden_verifier.write_text(
+                    verifier_template.read_text(encoding="utf-8").replace("__CANARY__", canary),
+                    encoding="utf-8",
+                )
+                translation = translate_harbor_task(
+                    pack_path,
+                    task,
+                    config,
+                    identity,
+                    temporary_root / "translation",
+                    hidden_verifier=hidden_verifier,
+                    test_agent_import_path=_test_agent_import_path,
+                )
+                (harbor_preflight or preflight)(final_output_dir, translation)
+                prepared.append((task, result_id, identity, translation))
+
             output_dir.mkdir(parents=True, exist_ok=False)
             (output_dir / "results").mkdir()
             backend = harbor_backend or HarborBackend()
-            attempt = asyncio.run(
-                backend.run_attempt(
-                    translation,
-                    identity,
-                    output_dir / "results",
-                    _fixture_profile=(
-                        _fixture_profile_token() if _test_agent_import_path is not None else None
-                    ),
+            summaries: list[dict[str, Any]] = []
+            for task, result_id, identity, translation in prepared:
+                attempt = asyncio.run(
+                    backend.run_attempt(
+                        translation,
+                        identity,
+                        output_dir / "results",
+                        _fixture_profile=(
+                            _fixture_profile_token()
+                            if _test_agent_import_path is not None
+                            else None
+                        ),
+                    )
                 )
-            )
-            bundle_dir = attempt.bundle_dir
-            run = attempt.run
+                bundle_dir = attempt.bundle_dir
+                run = attempt.run
+                prompt = (
+                    (translation.task_dir / "instruction.md")
+                    .read_text(encoding="utf-8")
+                    .rstrip("\n")
+                )
+                if _test_agent_import_path is None:
+                    from .run_bundle import finalize_real_pi_evidence
+
+                    termination_reason = (
+                        "timed_out"
+                        if run.get("agent_outcome") == "timed_out"
+                        else ("completed" if run.get("agent_outcome") == "succeeded" else "failed")
+                    )
+                    evidence_status = finalize_real_pi_evidence(
+                        bundle_dir,
+                        task={
+                            "id": task.id,
+                            "revision": pack.revision,
+                            "privacy_class": task.privacy_class.value,
+                            "prompt": prompt,
+                        },
+                        analysis_metadata={
+                            "provider": config.provider,
+                            "model": config.model,
+                            "harness": config.harness.model_dump(mode="json", exclude_none=True),
+                        },
+                        termination_reason=termination_reason,
+                    )
+                    run["evidence_status"] = evidence_status.value
+                summaries.append(
+                    {
+                        "id": result_id,
+                        "task_id": task.id,
+                        "configuration_id": config.id,
+                        "category": task.category,
+                        "lane": task.lane.value,
+                        "privacy_class": task.privacy_class.value,
+                        "provider": config.provider,
+                        "model": config.model,
+                        "harness": config.harness.model_dump(exclude_none=True),
+                        "prompt": prompt,
+                        "status": run["infrastructure_outcome"],
+                        "bundle": bundle_dir.relative_to(output_dir).as_posix(),
+                    }
+                )
+            evidence_values: list[dict[str, Any]] = []
+            for summary in summaries:
+                evidence_path = output_dir / summary["bundle"] / "mogil.harbor-evidence.json"
+                if evidence_path.is_file():
+                    value = json.loads(evidence_path.read_text(encoding="utf-8"))
+                    if not isinstance(value, dict):
+                        raise ValueError("generated Harbor evidence must be a JSON object")
+                    evidence_values.append(value)
+            if evidence_values:
+                (output_dir / "mogil.harbor-evidence.json").write_text(
+                    json.dumps(evidence_values, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                (output_dir / "mogil.harbor-evidence.jsonl").write_text(
+                    "".join(
+                        json.dumps(value, sort_keys=True) + "\n" for value in evidence_values
+                    ),
+                    encoding="utf-8",
+                )
+
             created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-            summary = {
-                "id": result_id,
-                "task_id": task.id,
-                "configuration_id": config.id,
-                "category": task.category,
-                "lane": task.lane.value,
-                "privacy_class": task.privacy_class.value,
-                "provider": config.provider,
-                "model": config.model,
-                "harness": config.harness.model_dump(exclude_none=True),
-                "prompt": (translation.task_dir / "instruction.md").read_text(
-                    encoding="utf-8"
-                ).rstrip("\n"),
-                "status": run["infrastructure_outcome"],
-                "bundle": bundle_dir.relative_to(output_dir).as_posix(),
-            }
             manifest = {
                 "schema_version": "1",
                 "created_at": created_at,
-                "pack": {"id": pack.id, "revision": pack.revision, "fingerprint": fingerprint},
-                "result_count": 1,
-                "results": [summary],
+                "pack": {
+                    "id": pack.id,
+                    "revision": pack.revision,
+                    "fingerprint": fingerprint,
+                },
+                "result_count": len(summaries),
+                "results": summaries,
             }
             (output_dir / "manifest.json").write_text(
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -517,9 +578,7 @@ def _atomic_run(
         raise
 
 
-_SHIPPED_FIXTURE_FINGERPRINT = (
-    "856415e01003df1ae8461f2bff251fd040c25e2dd9d0c3079531a8ce02c10317"
-)
+_SHIPPED_FIXTURE_FINGERPRINT = "856415e01003df1ae8461f2bff251fd040c25e2dd9d0c3079531a8ce02c10317"
 _SHIPPED_FIXTURE_HASHES = {
     "agent.py": "e4310f9e2fb61b11040b5e2d3bbcf5cf4ad070f467a30887c1871d32e09e506c",
     "calculator.py": "405aaadb887d880ae2e13d576ebd4524dd12a001bf832d778a05d243779dafcc",
