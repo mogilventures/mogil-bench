@@ -1,0 +1,30 @@
+version: "1"
+id: mogil-sample-v1
+revision: "2026-07-11.1"
+name: Mogil Bench representative sample
+description: Credential-free Hermes/text and Pi/coding examples.
+allow_commands: false
+tasks:
+  - id: support-summary
+    category: support-writing
+    lane: hermes-text
+    privacy_class: public
+    fixture: fixtures/ticket.txt
+    prompt: Summarize the fictional ticket in three bullets and draft a concise reply.
+    timeout_seconds: 10
+  - id: python-fix
+    category: coding-fix
+    lane: pi-coding
+    privacy_class: public
+    fixture: fixtures/coding
+    prompt: Diagnose the defect and describe a minimal patch plus behavioral verification.
+    timeout_seconds: 10
+configurations:
+  - id: deterministic-mock
+    provider: local
+    model: mogil-deterministic-mock-v1
+    adapter: mock
+    harness:
+      name: mogil-bench
+      version: "0.1.0"
+      sdk: mock

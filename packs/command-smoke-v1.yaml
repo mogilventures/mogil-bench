@@ -1,0 +1,29 @@
+version: "1"
+id: command-smoke-v1
+revision: "2026-07-11.1"
+name: Safe command adapter smoke pack
+description: Runs only a local Python argv command in an isolated temporary directory.
+allow_commands: true
+tasks:
+  - id: local-python-smoke
+    category: harness-smoke
+    lane: pi-coding
+    privacy_class: public
+    prompt: Execute the local deterministic smoke script and capture its result.
+    fixture: fixtures/smoke.py
+    timeout_seconds: 5
+    command: [python3, smoke.py]
+    verifier:
+      argv: [python3, smoke.py]
+      timeout_seconds: 5
+      expected_exit_code: 0
+      stdout_contains: SAFE_SMOKE_OK
+configurations:
+  - id: guarded-command
+    provider: local
+    model: local-command-smoke
+    adapter: command
+    harness:
+      name: mogil-bench-command
+      version: "0.1.0"
+      sdk: subprocess-argv

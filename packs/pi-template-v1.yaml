@@ -1,0 +1,29 @@
+version: "1"
+id: pi-local-template-v1
+revision: "2026-07-11.1"
+name: Trusted local Pi adapter template
+# TEMPLATE ONLY: choose a real provider/model/harness version before running.
+description: Explicit opt-in template for a one-shot Pi coding benchmark.
+allow_commands: false
+allow_agents: true
+tasks:
+  - id: fictional-clamp-fix
+    category: coding-fix
+    lane: pi-coding
+    privacy_class: public
+    fixture: fixtures/coding/calculator.py
+    prompt: Inspect calculator.py, fix the clamp defect in place, and report the change and verification.
+    timeout_seconds: 120
+    verifier:
+      argv: [python3, -c, "from calculator import clamp; assert clamp(5, 0, 10) == 5; assert clamp(-1, 0, 10) == 0; assert clamp(11, 0, 10) == 10"]
+      timeout_seconds: 10
+      expected_exit_code: 0
+configurations:
+  - id: replace-with-local-pi-config
+    provider: replace-me
+    model: replace-me
+    adapter: pi
+    harness:
+      name: pi-coding-agent
+      version: replace-with-local-pi-version
+      sdk: pi-print
