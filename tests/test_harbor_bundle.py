@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -16,6 +17,7 @@ from mogil_bench.run_bundle import (
     build_workspace_evidence,
     classify_evidence,
     collect_files,
+    finalize_real_pi_evidence,
     read_reward,
     validate_checksums,
     write_checksums,
@@ -346,6 +348,54 @@ def test_fixture_complete_requires_every_valid_artifact_and_confirmed_cleanup(
             classify_evidence(candidate, deterministic_fixture=True)
             == EvidenceStatus.INSUFFICIENT
         )
+
+
+def test_real_pi_is_quality_eligible_only_with_complete_canonical_evidence(
+    tmp_path: Path,
+) -> None:
+    from test_pi_evidence import _real_pi_stream
+
+    bundle = complete_bundle(tmp_path / "real")
+    (bundle / "agent/pi.txt").write_bytes(_real_pi_stream())
+    stale = b'{"stale":"pre-reviewer-hash"}\n'
+    (bundle / "mogil.harbor-evidence.json").write_bytes(stale)
+    (bundle / "mogil.harbor-evidence.jsonl").write_bytes(stale)
+    write_checksums(bundle)
+    assert validate_checksums(bundle)
+    status = finalize_real_pi_evidence(
+        bundle,
+        task={"id": "task", "revision": "1", "privacy_class": "public", "prompt": "Fix it"},
+        analysis_metadata={"provider": "private-provider", "model": "private-model"},
+        termination_reason="completed",
+    )
+    assert status == EvidenceStatus.QUALITY_ELIGIBLE
+    run = json.loads((bundle / "run.json").read_text())
+    assert run["evidence_status"] == "quality_eligible"
+    assert validate_checksums(bundle)
+    private_bytes = (bundle / "mogil.harbor-evidence.json").read_bytes()
+    jsonl_bytes = (bundle / "mogil.harbor-evidence.jsonl").read_bytes()
+    assert private_bytes != jsonl_bytes
+    assert json.loads(private_bytes) == json.loads(jsonl_bytes)
+    assert private_bytes != stale and jsonl_bytes != stale
+    expected = {
+        relative: digest
+        for digest, relative in (
+            line.split("  ", 1)
+            for line in (bundle / "checksums.sha256").read_text().splitlines()
+        )
+    }
+    assert expected["mogil.harbor-evidence.json"] == hashlib.sha256(private_bytes).hexdigest()
+    assert expected["mogil.harbor-evidence.jsonl"] == hashlib.sha256(jsonl_bytes).hexdigest()
+
+    malformed = complete_bundle(tmp_path / "malformed-real")
+    (malformed / "agent/pi.txt").write_bytes(b'{"type":"session"}')
+    write_checksums(malformed)
+    assert finalize_real_pi_evidence(
+        malformed,
+        task={"id": "task", "revision": "1", "privacy_class": "public", "prompt": "Fix it"},
+        analysis_metadata={},
+        termination_reason="failed",
+    ) == EvidenceStatus.INSUFFICIENT
 
 
 def test_reward_one_cannot_override_corruption_or_cleanup_failure(tmp_path: Path) -> None:

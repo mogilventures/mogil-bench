@@ -6,6 +6,7 @@ import json
 import math
 import os
 import stat
+import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -278,6 +279,24 @@ def collect_files(
         destination.write_bytes(data)
 
 
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def write_checksums(bundle_root: Path) -> Path:
     checksum_path = bundle_root / "checksums.sha256"
     entries: list[str] = []
@@ -286,7 +305,7 @@ def write_checksums(bundle_root: Path) -> Path:
             continue
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         entries.append(f"{digest}  {relative}\n")
-    checksum_path.write_text("".join(entries), encoding="utf-8")
+    _atomic_write_bytes(checksum_path, "".join(entries).encode("utf-8"))
     return checksum_path
 
 
@@ -363,6 +382,80 @@ def _read_object(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"expected JSON object: {path.name}")
     return value
+
+
+def finalize_real_pi_evidence(
+    bundle_root: Path,
+    *,
+    task: dict[str, str],
+    analysis_metadata: dict[str, Any],
+    termination_reason: str,
+) -> EvidenceStatus:
+    """Promote a real Pi run only after foundation and trajectory evidence both validate."""
+    if (
+        classify_evidence(bundle_root, deterministic_fixture=True)
+        != EvidenceStatus.FIXTURE_COMPLETE
+    ):
+        return EvidenceStatus.INSUFFICIENT
+    try:
+        from .evidence import build_harbor_evidence, validate_evidence_artifact
+
+        run_path = bundle_root / "run.json"
+        run = _read_object(run_path)
+        outcomes = {
+            "process": str(run.get("agent_outcome")),
+            "verifier": str(run.get("verifier_outcome")),
+            "infrastructure": str(run.get("infrastructure_outcome")),
+            "evidence_completeness": "complete",
+        }
+        artifact = build_harbor_evidence(
+            bundle_root,
+            run_id=str(run["logical_run_id"]),
+            attempt_id=str(run["attempt_id"]),
+            task=task,
+            outcomes=outcomes,
+            analysis_metadata=analysis_metadata,
+            termination_reason=termination_reason,
+        )
+        private_path = bundle_root / "mogil.harbor-evidence.json"
+        jsonl_path = bundle_root / "mogil.harbor-evidence.jsonl"
+        artifact_value = artifact.model_dump(
+            mode="json",
+            by_alias=True,
+            exclude_none=True,
+        )
+        json_bytes = (
+            json.dumps(artifact_value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+        ).encode("utf-8")
+        jsonl_bytes = (
+            json.dumps(
+                artifact_value,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+        _atomic_write_bytes(private_path, json_bytes)
+        _atomic_write_bytes(jsonl_path, jsonl_bytes)
+        if (
+            validate_evidence_artifact(private_path) != 1
+            or validate_evidence_artifact(jsonl_path) != 1
+        ):
+            raise BundleError("generated evidence artifact failed validation")
+        run["evidence_status"] = EvidenceStatus.QUALITY_ELIGIBLE.value
+        _atomic_write_bytes(
+            run_path,
+            (json.dumps(run, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        )
+        write_checksums(bundle_root)
+        if not validate_checksums(bundle_root):
+            raise BundleError("generated evidence checksums failed validation")
+        return EvidenceStatus.QUALITY_ELIGIBLE
+    except (BundleError, KeyError, OSError, UnicodeError, ValueError):
+        for name in ("mogil.harbor-evidence.json", "mogil.harbor-evidence.jsonl"):
+            (bundle_root / name).unlink(missing_ok=True)
+        return EvidenceStatus.INSUFFICIENT
 
 
 def classify_evidence(

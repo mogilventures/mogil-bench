@@ -1,0 +1,48 @@
+version: '1'
+id: pi-activation-fictional-v1
+revision: '1'
+name: Fictional Pi trajectory activation
+# Public, synthetic tasks only. Run each task as an independent Harbor attempt.
+allow_agents: true
+tasks:
+  - id: normalize-widget-slugs
+    category: coding
+    lane: pi-coding
+    privacy_class: public
+    prompt: Fix slugify.py so slugify handles mixed case, repeated separators, and surrounding whitespace. Keep the implementation small and dependency-free.
+    fixture: fixtures/pi-activation/slugify
+    timeout_seconds: 120
+    verifier:
+      argv: [python, /tests/hidden_verify.py, /workspace]
+      timeout_seconds: 15
+  - id: summarize-fictional-inventory
+    category: coding
+    lane: pi-coding
+    privacy_class: public
+    prompt: Fix inventory.py so summarize returns deterministic totals by fictional warehouse and rejects negative quantities. Do not add dependencies.
+    fixture: fixtures/pi-activation/inventory
+    timeout_seconds: 120
+    verifier:
+      argv: [python, /tests/hidden_verify.py, /workspace]
+      timeout_seconds: 15
+  - id: merge-fictional-windows
+    category: coding
+    lane: pi-coding
+    privacy_class: public
+    prompt: Fix windows.py so merge_windows sorts and merges overlapping or touching integer windows without mutating its input. Keep the public function signature.
+    fixture: fixtures/pi-activation/windows
+    timeout_seconds: 120
+    verifier:
+      argv: [python, /tests/hidden_verify.py, /workspace]
+      timeout_seconds: 15
+configurations:
+  - id: harbor-pi-activation
+    provider: anthropic
+    model: claude-sonnet-4-6
+    adapter: harbor
+    backend: harbor
+    environment_type: docker
+    mounts: []
+    harness:
+      name: harbor-pi
+      version: '0.18.0'

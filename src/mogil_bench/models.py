@@ -37,6 +37,7 @@ class EvidenceStatus(StrEnum):
     NON_QUALITY = "non_quality"
     INSUFFICIENT = "insufficient"
     FIXTURE_COMPLETE = "fixture_complete"
+    QUALITY_ELIGIBLE = "quality_eligible"
 
 
 class AgentOutcome(StrEnum):
