@@ -32,6 +32,7 @@ from mogil_bench.models import (
     Harness,
     Pack,
     create_attempt_identity,
+    create_numbered_attempt_identity,
 )
 from mogil_bench.runner import _run_shipped_fixture_pack, logical_run_id, run_pack
 
@@ -106,6 +107,16 @@ def test_harbor_config_requires_pi_coding_lane_and_agent_opt_in() -> None:
     raw["allow_agents"] = False
     with pytest.raises(ValidationError, match="allow_agents"):
         Pack.model_validate(raw)
+
+
+def test_numbered_attempt_identity_is_stable_and_distinct() -> None:
+    assert create_numbered_attempt_identity("logical", 1) == create_numbered_attempt_identity(
+        "logical", 1
+    )
+    assert (
+        create_numbered_attempt_identity("logical", 1).attempt_id
+        != create_numbered_attempt_identity("logical", 2).attempt_id
+    )
 
 
 def test_logical_identity_is_stable_and_attempt_identity_is_unique() -> None:
@@ -650,6 +661,100 @@ configurations:
         "attempt-two",
     ]
     assert validate_artifact(run_dir / "blindbench.json") == 2
+
+
+def test_runner_rejects_multiple_attempts_for_non_harbor_pack(tmp_path: Path) -> None:
+    output = tmp_path / "run"
+    with pytest.raises(ValueError, match="only for Harbor"):
+        run_pack(Path("packs/sample-v1.yaml"), output, attempts=2)
+    assert not output.exists()
+
+
+def test_runner_expands_harbor_matrix_into_distinct_attempts(tmp_path: Path) -> None:
+    fixture = tmp_path / "task"
+    fixture.mkdir()
+    (fixture / "calculator.py").write_text("def add(a, b): return a - b\n", encoding="utf-8")
+    (fixture / "verify.py").write_text("print('__CANARY__')\n", encoding="utf-8")
+    pack_path = tmp_path / "pack.yaml"
+    pack_path.write_text(
+        """version: '1'
+id: parity
+revision: '1'
+name: Provider parity
+allow_agents: true
+tasks:
+  - id: calculator
+    category: coding
+    lane: pi-coding
+    prompt: Fix add.
+    fixture: task
+    verifier: {argv: [python, /tests/hidden_verify.py, /workspace]}
+configurations:
+  - id: direct
+    provider: anthropic
+    model: claude-sonnet-4-6
+    adapter: harbor
+    harness: {name: harbor, version: '0.18.0'}
+  - id: routed
+    provider: openrouter
+    model: anthropic/claude-sonnet-4.6
+    adapter: harbor
+    harness: {name: harbor, version: '0.18.0'}
+""",
+        encoding="utf-8",
+    )
+    calls: list[tuple[str, str]] = []
+
+    class FakeBackend:
+        async def run_attempt(
+            self,
+            translation: Any,
+            identity: Any,
+            output_root: Path,
+            **_kwargs: object,
+        ) -> Any:
+            calls.append((str(translation.agent_config["model_name"]), identity.attempt_id))
+            bundle = output_root / identity.logical_run_id / identity.attempt_id
+            bundle.mkdir(parents=True)
+            run = {
+                "bundle_version": "1",
+                "logical_run_id": identity.logical_run_id,
+                "attempt_id": identity.attempt_id,
+                "harbor_version": "0.18.0",
+                "pi_version": "0.80.6",
+                "agent_log_format": "raw_filtered_pi_events",
+                "evidence_status": "insufficient",
+                "agent_outcome": "succeeded",
+                "verifier_outcome": "passed",
+                "infrastructure_outcome": "succeeded",
+            }
+            (bundle / "run.json").write_text(json.dumps(run), encoding="utf-8")
+            return SimpleNamespace(bundle_dir=bundle, run=run)
+
+    ids = iter(f"attempt-{index}" for index in range(6))
+    run_dir = run_pack(
+        pack_path,
+        tmp_path / "run",
+        allow_agents=True,
+        attempts=3,
+        harbor_backend=FakeBackend(),
+        harbor_preflight=lambda _output, _translation: None,
+        attempt_id_factory=lambda: next(ids),
+    )
+
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["result_count"] == 6
+    assert [item["attempt_number"] for item in manifest["results"]] == [1, 2, 3, 1, 2, 3]
+    assert len({item["attempt_id"] for item in manifest["results"]}) == 6
+    assert len({item["logical_run_id"] for item in manifest["results"]}) == 2
+    assert [model for model, _attempt in calls] == [
+        "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-sonnet-4-6",
+        "openrouter/anthropic/claude-sonnet-4.6",
+        "openrouter/anthropic/claude-sonnet-4.6",
+        "openrouter/anthropic/claude-sonnet-4.6",
+    ]
 
 
 def test_issue_six_adds_quality_eligible_without_changing_fixture_state() -> None:

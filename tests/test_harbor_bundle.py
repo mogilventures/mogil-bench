@@ -587,7 +587,9 @@ def test_harbor_bundle_projects_to_reviewer_safe_blindbench_v1(tmp_path: Path) -
     assert record["id"] == "logical"
     assert record["environment"] == "harbor/docker"
     assert record["metadata"] == {
+        "logical_run_id": "logical",
         "attempt_id": "attempt",
+        "attempt_number": 1,
         "bundle_reference": "results/logical/attempt",
         "category": "coding",
         "configuration_id": "harbor",

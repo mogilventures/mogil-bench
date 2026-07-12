@@ -237,6 +237,20 @@ def test_pi_0806_parallel_tool_calls_preserve_distinct_ids_and_completion_order(
     assert trajectory.events[-1].kind == "termination"
 
 
+def test_evidence_batch_allows_same_logical_run_with_distinct_attempts(
+    tmp_path: Path,
+) -> None:
+    artifact = json.loads(
+        Path("tests/fixtures/daytona-reviewer-contract.json").read_text(encoding="utf-8")
+    )
+    second = copy.deepcopy(artifact)
+    second["run"]["attempt"] = "fictional-attempt-2"
+    path = tmp_path / "attempts.json"
+    path.write_text(json.dumps([artifact, second]), encoding="utf-8")
+
+    assert validate_evidence_artifact(path) == 2
+
+
 def test_pi_tool_errors_remain_explicit_and_linked() -> None:
     rows = [json.loads(line) for line in _real_pi_stream().splitlines()]
     for row in rows:

@@ -4,7 +4,7 @@ import re
 from collections.abc import Callable
 from enum import StrEnum
 from typing import Any, Literal
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, field_validator, model_validator
 
@@ -122,6 +122,19 @@ def create_attempt_identity(
     return AttemptIdentity(
         logical_run_id=logical_run_id,
         attempt_id=str(attempt_id_factory()),
+    )
+
+
+def create_numbered_attempt_identity(
+    logical_run_id: str, attempt_number: int
+) -> AttemptIdentity:
+    if attempt_number < 1:
+        raise ValueError("attempt number must be positive")
+    return AttemptIdentity(
+        logical_run_id=logical_run_id,
+        attempt_id=str(
+            uuid5(NAMESPACE_URL, f"mogil-bench:{logical_run_id}:attempt:{attempt_number}")
+        ),
     )
 
 

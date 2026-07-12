@@ -44,7 +44,7 @@ Each run contains:
 - `blindbench.json`: `{ "records": [...] }` batch;
 - `blindbench.jsonl`: one `eval-record` v1 object per line.
 
-Record IDs are deterministic hashes of canonical task, configuration, pack revision, and fixture content. Timestamps do not affect IDs, so retries deduplicate in BlindBench. V1 records measured duration. It omits token counts and cost unless an adapter has authoritative values; mock word counts are not reported as tokens.
+Record IDs are deterministic hashes of canonical task, configuration, pack revision, and fixture content. Timestamps do not affect IDs, so retries deduplicate in BlindBench. Harbor runs additionally accept `--attempts 1..10`; each task/configuration keeps its stable logical ID while every numbered attempt gets a distinct deterministic attempt ID. Multiple attempts are rejected for non-Harbor adapters. V1 records measured duration. It omits token counts and cost unless an adapter has authoritative values; mock word counts are not reported as tokens.
 
 ## Pack format
 
@@ -147,6 +147,76 @@ MOGIL_DAYTONA_SECRET_REF='mogil-anthropic-smoke' \
 ```
 
 Without `MOGIL_RUN_DAYTONA_SMOKE=1` the test skips explicitly. With the gate enabled, missing credentials, an unpinned/missing image, or a missing restricted secret reference fails with a specific blocker; it never substitutes fake output. Successful output is accepted only when the quality evidence is complete and both sandbox deletions are confirmed.
+
+### Daytona provider-parity matrix
+
+[`packs/daytona-provider-parity-v1.yaml`](packs/daytona-provider-parity-v1.yaml) is the reviewed public/synthetic matrix: calculator correction, slug normalization, and inventory aggregation; Anthropic direct and OpenRouter; three independent attempts per cell. All 18 attempts are sequential (`n_concurrent_trials: 1`), retry-free, Harbor-managed, and use the immutable runtime image at digest `sha256:7728671c38220e066d23f63fd2544cc0722874ec40e1c86c883c8cc4d6c35dfe`. Attempt IDs are deterministic UUIDs of the stable task/configuration logical ID plus the one-based attempt number. This makes reruns reproducible without copying task data; each attempt still receives fresh agent/verifier sandboxes and a separate hidden-verifier canary.
+
+Pi 0.80.6 names the direct model `anthropic/claude-sonnet-4-6` and its OpenRouter catalog entry `openrouter/anthropic/claude-sonnet-4.6` (OpenRouter uses a dot in `4.6`). These entries identify Claude Sonnet 4.6 as closely as this pinned Pi catalog supports. OpenRouter remains an extra transport/routing layer and may choose an eligible upstream endpoint for that exact model identifier; this benchmark does not claim identical serving infrastructure or rank either provider.
+
+Before authorization, create these **organization secrets in the Daytona dashboard or secret API**. Enter values only into Daytona's write-only value field—never into this repository, pack YAML, shell arguments, logs, or `.env` files:
+
+| Daytona secret name | Value type | Exact allowed hosts |
+|---|---|---|
+| `mogil-anthropic-smoke` | Anthropic API key | `api.anthropic.com` |
+| `mogil-openrouter-parity` | OpenRouter API key | `openrouter.ai` |
+
+To create a missing secret through the pinned SDK without putting its value in shell history, use this interactive command. Set `NAME=mogil-openrouter-parity HOST=openrouter.ai` for OpenRouter (or the corresponding Anthropic row); it refuses to overwrite an existing secret:
+
+```bash
+NAME=mogil-openrouter-parity HOST=openrouter.ai .venv/bin/python - <<'PY'
+import getpass
+import os
+from daytona import CreateSecretParams, Daytona
+
+name, host = os.environ["NAME"], os.environ["HOST"]
+client = Daytona()
+existing = {secret.name for secret in client.secret.list(limit=200).items}
+if name in existing:
+    raise SystemExit(f"secret already exists; verify its host policy: {name}")
+client.secret.create(CreateSecretParams(
+    name=name,
+    value=getpass.getpass("Secret value: "),
+    hosts=[host],
+))
+print(f"created restricted organization secret: {name}")
+PY
+```
+
+Verify both names and exact host restrictions without printing values:
+
+```bash
+.venv/bin/python - <<'PY'
+from mogil_bench.parity import daytona_secret_inventory, validate_secret_inventory
+validate_secret_inventory(daytona_secret_inventory())
+print("parity secret metadata valid")
+PY
+```
+
+Install the pinned integration and provide only Daytona manager credentials locally. The live command first lists secret **metadata** (names and allowed hosts; Daytona does not return values), rejects absent or unrestricted secrets, validates the fixed pack/image/model boundary, and then invokes the generic Harbor runner with `--attempts 3`. The explicit environment gate prevents accidental paid execution:
+
+```bash
+python -m pip install -e '.[dev,daytona]'
+export DAYTONA_API_KEY='manager-credential' # or JWT + organization ID
+MOGIL_RUN_DAYTONA_PARITY=1 mogil-bench run-daytona-parity \
+  --output-dir /tmp/mogil-daytona-provider-parity
+```
+
+Do not also export `ANTHROPIC_API_KEY` or `OPENROUTER_API_KEY`; manager preflight rejects plaintext model credentials. There is no host-Pi or mock fallback. An unavailable image, wrong in-image Python/Pi version, policy mismatch, failed attempt, incomplete evidence, or unconfirmed cleanup makes the parity command fail; retries never hide it. The image's existence and in-sandbox Python 3.12, `/bin/sh`, and Pi 0.80.6 checks occur at the real Daytona boundary, so they cannot be claimed by metadata-only validation.
+
+The run root contains aggregate strict evidence with 18 lines plus one bundle per attempt. Validate and dry-run the exact uploads before adding `--confirm`:
+
+```bash
+mogil-bench evidence validate /tmp/mogil-daytona-provider-parity/mogil.harbor-evidence.jsonl
+mogil-bench artifact validate /tmp/mogil-daytona-provider-parity/blindbench.jsonl
+mogil-bench evidence upload /tmp/mogil-daytona-provider-parity/mogil.harbor-evidence.jsonl \
+  --endpoint https://BLINDBENCH_HOST/ingest/v1/eval-runs
+BLINDBENCH_AUTOMATION_TOKEN='project-token' mogil-bench evidence upload \
+  /tmp/mogil-daytona-provider-parity/mogil.harbor-evidence.jsonl \
+  --endpoint https://BLINDBENCH_HOST/ingest/v1/eval-runs --confirm
+```
+
+The private envelope retains provider/model provenance. Its `reviewer` projection contains the shared task identity, blinded `isolated-sandbox` class, trajectory, objective outcomes, and bounded evidence—but no provider, model, configuration ID, secret name, or secret value—so BlindBench can group same-task attempts without exposing the comparison arm to reviewers.
 
 ## Command safety
 

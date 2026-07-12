@@ -78,6 +78,10 @@ def _harbor_record(
         if environment_provider == "docker"
         else "harbor/isolated-sandbox"
     )
+    if summary.get("logical_run_id", run.logical_run_id) != run.logical_run_id:
+        raise ArtifactError("manifest logical run identity does not match bundle")
+    if summary.get("attempt_id", run.attempt_id) != run.attempt_id:
+        raise ArtifactError("manifest attempt identity does not match bundle")
     metadata = {
         "pack_id": manifest["pack"]["id"],
         "pack_revision": manifest["pack"]["revision"],
@@ -85,7 +89,9 @@ def _harbor_record(
         "task_id": summary["task_id"],
         "configuration_id": summary["configuration_id"],
         "category": summary["category"],
+        "logical_run_id": run.logical_run_id,
         "attempt_id": run.attempt_id,
+        "attempt_number": summary.get("attempt_number", 1),
         "bundle_reference": reference.as_posix(),
         "evidence_status": run.evidence_status.value,
         "agent_outcome": run.agent_outcome.value,
