@@ -411,20 +411,27 @@ def _run_pack_to_directory(
             output_dir.mkdir(parents=True, exist_ok=False)
             (output_dir / "results").mkdir()
             backend = harbor_backend or HarborBackend()
-            summaries: list[dict[str, Any]] = []
-            for task, config, result_id, attempt_number, identity, translation in prepared:
-                attempt = asyncio.run(
-                    backend.run_attempt(
-                        translation,
-                        identity,
-                        output_dir / "results",
-                        _fixture_profile=(
-                            _fixture_profile_token()
-                            if _test_agent_import_path is not None
-                            else None
-                        ),
+            async def run_prepared_attempts() -> list[HarborAttemptResult]:
+                attempt_results = []
+                for _task, _config, _result_id, _number, identity, translation in prepared:
+                    attempt_results.append(
+                        await backend.run_attempt(
+                            translation,
+                            identity,
+                            output_dir / "results",
+                            _fixture_profile=(
+                                _fixture_profile_token()
+                                if _test_agent_import_path is not None
+                                else None
+                            ),
+                        )
                     )
-                )
+                return attempt_results
+
+            attempt_results = asyncio.run(run_prepared_attempts())
+            summaries: list[dict[str, Any]] = []
+            for prepared_attempt, attempt in zip(prepared, attempt_results, strict=True):
+                task, config, result_id, attempt_number, identity, translation = prepared_attempt
                 bundle_dir = attempt.bundle_dir
                 run = attempt.run
                 prompt = (

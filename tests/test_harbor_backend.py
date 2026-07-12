@@ -566,7 +566,7 @@ def test_cleanup_failure_changes_infrastructure_and_evidence(tmp_path: Path) -> 
     assert result.evidence_status == EvidenceStatus.INSUFFICIENT
 
 
-def test_runner_dispatches_harbor_tasks_as_independent_attempts_without_host_pi(
+def test_runner_dispatches_harbor_attempts_sequentially_on_one_owned_event_loop(
     tmp_path: Path,
 ) -> None:
     fixture = tmp_path / "harbor-coding-task"
@@ -608,6 +608,7 @@ configurations:
         encoding="utf-8",
     )
     calls: list[str] = []
+    running_loops: list[asyncio.AbstractEventLoop] = []
 
     class FakeBackend:
         async def run_attempt(
@@ -618,6 +619,11 @@ configurations:
             **_kwargs: object,
         ) -> Any:
             calls.append("backend")
+            running_loop = asyncio.get_running_loop()
+            if running_loops:
+                assert running_loop is running_loops[0]
+                assert not running_loops[0].is_closed()
+            running_loops.append(running_loop)
             bundle = output_root / identity.logical_run_id / identity.attempt_id
             bundle.mkdir(parents=True)
             run = {
@@ -654,6 +660,9 @@ configurations:
     )
 
     assert calls == ["preflight", "preflight", "backend", "backend"]
+    assert len(running_loops) == 2
+    assert running_loops[0] is running_loops[1]
+    assert running_loops[0].is_closed()
     manifest = json.loads((run_dir / "manifest.json").read_text())
     assert manifest["result_count"] == 2
     assert [Path(item["bundle"]).name for item in manifest["results"]] == [
