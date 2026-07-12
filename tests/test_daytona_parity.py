@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
+from typer.core import TyperOption
+from typer.main import get_command
 
 from mogil_bench.cli import app
 from mogil_bench.harbor_tasks import translate_harbor_task
@@ -105,9 +106,13 @@ def test_parity_pack_validation_rejects_policy_or_task_drift() -> None:
 
 
 def test_cli_exposes_bounded_attempt_count() -> None:
-    result = CliRunner().invoke(app, ["run", "--help"])
-    assert result.exit_code == 0
-    assert "--attempts" in result.stdout
+    run_command = get_command(app).commands["run"]
+    option = next(parameter for parameter in run_command.params if parameter.name == "attempts")
+
+    assert isinstance(option, TyperOption)
+    assert option.opts == ["--attempts"]
+    assert option.default == 1
+    assert (option.type.min, option.type.max) == (1, 10)
 
 
 def test_live_parity_is_manually_gated_before_network_or_output(
