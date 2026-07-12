@@ -211,7 +211,7 @@ class ReviewerEvidence(StrictEvidenceModel):
 
 class ReviewerProjection(StrictEvidenceModel):
     task: TaskEvidence
-    environment_class: Literal["docker"]
+    environment_class: Literal["docker", "isolated-sandbox"]
     harness_schema: Literal["harbor/pi-jsonl@0.18.0"]
     events: list[CanonicalEvent]
     outcomes: Outcomes
@@ -304,6 +304,25 @@ class HarborEvidence(StrictEvidenceModel):
             if self.run.termination_reason != "completed":
                 raise ValueError("quality eligible run requires completed termination")
         return self
+
+
+def _reviewer_environment_class(bundle: Path) -> Literal["docker", "isolated-sandbox"]:
+    path = bundle / "environment.json"
+    if not path.is_file():
+        # Backward compatibility for callers producing the pre-Daytona Docker bundle.
+        return "docker"
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise EvidenceError("invalid private environment evidence") from error
+    if not isinstance(value, dict):
+        raise EvidenceError("invalid private environment evidence")
+    provider = value.get("provider", value.get("type"))
+    if provider == "docker":
+        return "docker"
+    if provider == "daytona":
+        return "isolated-sandbox"
+    raise EvidenceError("unsupported private environment provider")
 
 
 def build_harbor_evidence(
@@ -416,7 +435,7 @@ def build_harbor_evidence(
     )
     reviewer = ReviewerProjection(
         task=task_evidence,
-        environment_class="docker",
+        environment_class=_reviewer_environment_class(bundle),
         harness_schema="harbor/pi-jsonl@0.18.0",
         events=reviewer_events,
         outcomes=parsed_outcomes,

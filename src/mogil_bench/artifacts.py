@@ -65,6 +65,19 @@ def _harbor_record(
         run = HarborRunRecord.model_validate(_read_json(bundle / "run.json"))
     except ValidationError as error:
         raise ArtifactError(f"invalid Mogil Harbor run.json: {error}") from error
+    environment_value = _read_json(bundle / "environment.json") if (
+        bundle / "environment.json"
+    ).is_file() else {"type": "docker"}
+    environment_provider = environment_value.get(
+        "provider", environment_value.get("type")
+    )
+    if environment_provider not in {"docker", "daytona"}:
+        raise ArtifactError("unsupported Harbor environment provider")
+    environment_name = (
+        "harbor/docker"
+        if environment_provider == "docker"
+        else "harbor/isolated-sandbox"
+    )
     metadata = {
         "pack_id": manifest["pack"]["id"],
         "pack_revision": manifest["pack"]["revision"],
@@ -89,7 +102,7 @@ def _harbor_record(
         "output": None,
         "product": "mogil-bench",
         "module": summary["lane"],
-        "environment": "harbor/docker",
+        "environment": environment_name,
         "harness": summary["harness"],
         "metadata": metadata,
         "privacy_class": summary["privacy_class"],

@@ -1,0 +1,173 @@
+{
+  "analysis_metadata": {
+    "harness": {
+      "name": "harbor",
+      "version": "0.18.0"
+    },
+    "model": "fictional-model",
+    "provider": "fictional-provider"
+  },
+  "harness": {
+    "name": "harbor/pi",
+    "schema": "0.18.0"
+  },
+  "outcomes": {
+    "evidence_completeness": "complete",
+    "infrastructure": "succeeded",
+    "process": "succeeded",
+    "verifier": "passed"
+  },
+  "raw": {
+    "path": "agent/pi.txt",
+    "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+  },
+  "reviewer": {
+    "environment_class": "isolated-sandbox",
+    "events": [
+      {
+        "content": "Fix it",
+        "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+        "kind": "user_message",
+        "sequence": 0,
+        "timestamp": "2026-07-11T00:00:01+00:00"
+      },
+      {
+        "content": "inspect",
+        "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+        "kind": "assistant_reasoning",
+        "sequence": 1,
+        "stop_reason": "toolUse",
+        "timestamp": "2026-07-11T00:00:02+00:00"
+      },
+      {
+        "content": "I will edit.",
+        "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+        "kind": "assistant_message",
+        "sequence": 2,
+        "stop_reason": "toolUse",
+        "timestamp": "2026-07-11T00:00:02+00:00"
+      },
+      {
+        "arguments": {
+          "newText": "y",
+          "oldText": "x",
+          "path": "[WORKSPACE_PATH]"
+        },
+        "call_id": "call-1",
+        "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+        "kind": "tool_call",
+        "sequence": 3,
+        "tool_name": "edit"
+      },
+      {
+        "call_id": "call-1",
+        "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+        "kind": "tool_result",
+        "result": {
+          "content": [
+            {
+              "text": "edited [WORKSPACE_PATH]",
+              "type": "text"
+            }
+          ]
+        },
+        "sequence": 4,
+        "tool_name": "edit"
+      },
+      {
+        "content": "Done.",
+        "id": "evt-801e849f712d9419a74239162701e795",
+        "kind": "final_output",
+        "sequence": 5,
+        "stop_reason": "stop",
+        "timestamp": "2026-07-11T00:00:04+00:00"
+      },
+      {
+        "content": "completed",
+        "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+        "kind": "termination",
+        "sequence": 6
+      }
+    ],
+    "evidence": {
+      "changed_files": [
+        {
+          "path": "calculator.py",
+          "status": "modified"
+        }
+      ],
+      "changed_files_reference": {
+        "path": "workspace/changed-files.json",
+        "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+        "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+      },
+      "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+      "patch_reference": {
+        "path": "workspace/patch.diff",
+        "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+        "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+      },
+      "patch_truncated": false,
+      "verifier_command_summary": "hidden deterministic verifier",
+      "verifier_exit_code": 0,
+      "verifier_references": [
+        {
+          "path": "verifier/stdout.txt",
+          "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+          "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+        },
+        {
+          "path": "verifier/stderr.txt",
+          "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "verifier_stderr": "",
+      "verifier_stderr_truncated": false,
+      "verifier_stdout": "fixture passed\n",
+      "verifier_stdout_truncated": false,
+      "verifier_timed_out": false
+    },
+    "harness_schema": "harbor/pi-jsonl@0.18.0",
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "task": {
+      "id": "fictional-calculator",
+      "privacy_class": "public",
+      "prompt": "Correct the fictional calculator.",
+      "revision": "1"
+    }
+  },
+  "rewards": {
+    "command_exit": 1.0,
+    "reward": 1.0,
+    "stdout_assertion": 1.0
+  },
+  "run": {
+    "attempt": "fictional-attempt",
+    "ended_at": "2026-07-11T00:00:03+00:00",
+    "id": "daytona-consumer-contract",
+    "started_at": "2026-07-11T00:00:00+00:00",
+    "status": "quality_eligible",
+    "termination_reason": "completed"
+  },
+  "schema": "mogil.harbor-evidence",
+  "usage": {
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "cost_usd": 0.03,
+    "input_tokens": 6,
+    "output_tokens": 4,
+    "total_tokens": 10
+  },
+  "version": "1.0"
+}

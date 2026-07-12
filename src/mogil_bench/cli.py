@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -21,10 +22,12 @@ pack_app = typer.Typer(help="Inspect and validate benchmark packs.")
 artifact_app = typer.Typer(help="Validate or upload BlindBench artifacts.")
 evidence_app = typer.Typer(help="Validate or upload mogil.harbor-evidence artifacts.")
 export_app = typer.Typer(help="Export run artifacts.")
+sandbox_app = typer.Typer(help="Maintain Harbor-managed remote sandboxes.")
 app.add_typer(pack_app, name="pack")
 app.add_typer(export_app, name="export")
 app.add_typer(artifact_app, name="artifact")
 app.add_typer(evidence_app, name="evidence")
+app.add_typer(sandbox_app, name="sandbox")
 
 
 def _fail(message: str) -> None:
@@ -97,6 +100,38 @@ def run(
     ) as error:
         _fail(str(error))
     typer.echo(f"run written to {destination}")
+
+
+@sandbox_app.command("reap-daytona")
+def reap_daytona(
+    delete_limit: Annotated[int, typer.Option(min=1, max=100)] = 20,
+    scan_limit: Annotated[int, typer.Option(min=1, max=500)] = 100,
+) -> None:
+    """Delete only expired Mogil-labeled Daytona sandboxes and confirm absence."""
+    if not os.environ.get("DAYTONA_API_KEY") and not (
+        os.environ.get("DAYTONA_JWT_TOKEN") and os.environ.get("DAYTONA_ORGANIZATION_ID")
+    ):
+        _fail(
+            "Daytona credentials unavailable: set DAYTONA_API_KEY or both "
+            "DAYTONA_JWT_TOKEN and DAYTONA_ORGANIZATION_ID"
+        )
+    try:
+        from .harbor_daytona import HarborDaytonaReaperClient, reap_expired
+
+        result = asyncio.run(
+            reap_expired(
+                HarborDaytonaReaperClient(),
+                now=datetime.now(UTC),
+                delete_limit=delete_limit,
+                scan_limit=scan_limit,
+            )
+        )
+    except (ImportError, OSError, RuntimeError, ValueError) as error:
+        _fail(str(error))
+    typer.echo(
+        f"scanned={result.scanned} expired={result.expired} "
+        f"deleted={result.deleted} remaining={result.remaining}"
+    )
 
 
 @export_app.command("blindbench")

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .harbor_backend import PI_VERSION
 from .harbor_pi import HARBOR_PI_IMPORT_PATH
-from .models import AttemptIdentity, Configuration, Task
+from .models import AttemptIdentity, Configuration, EnvironmentType, Task
 from .packs import resolve_fixture
 
 PYTHON_BASE_IMAGE = (
@@ -160,7 +160,17 @@ def write_verifier_wrapper(
     )
 
 
-def _task_toml(task: Task, *, agent_network: str) -> str:
+def _task_toml(
+    task: Task,
+    *,
+    agent_network: str,
+    allowed_hosts: list[str],
+    image: str | None,
+    cpus: int,
+    memory_mb: int,
+    storage_mb: int,
+    verifier_workdir: str,
+) -> str:
     if task.verifier is None:
         raise ValueError("Harbor coding tasks require a verifier")
     return f'''schema_version = "1.3"
@@ -169,13 +179,16 @@ artifacts = [{{ source = "/workspace", destination = "candidate-workspace" }}]
 [agent]
 timeout_sec = {task.timeout_seconds!r}
 network_mode = "{agent_network}"
+allowed_hosts = {allowed_hosts!r}
 
 [environment]
 build_timeout_sec = {BUILD_TIMEOUT_SECONDS}.0
-cpus = {AGENT_CPUS}
-memory_mb = {AGENT_MEMORY_MB}
-storage_mb = {AGENT_STORAGE_MB}
+cpus = {cpus}
+memory_mb = {memory_mb}
+storage_mb = {storage_mb}
 network_mode = "{agent_network}"
+allowed_hosts = {allowed_hosts!r}
+{f'docker_image = {image!r}' if image else ''}
 workdir = "/workspace"
 
 [verifier]
@@ -185,11 +198,12 @@ network_mode = "no-network"
 
 [verifier.environment]
 build_timeout_sec = {BUILD_TIMEOUT_SECONDS}.0
-cpus = {AGENT_CPUS}
-memory_mb = {AGENT_MEMORY_MB}
-storage_mb = {AGENT_STORAGE_MB}
+cpus = {cpus}
+memory_mb = {memory_mb}
+storage_mb = {storage_mb}
 network_mode = "no-network"
-workdir = "/workspace"
+{f'docker_image = {image!r}' if image else ''}
+workdir = "{verifier_workdir}"
 '''
 
 
@@ -226,7 +240,8 @@ def translate_harbor_task(
     task_dir.mkdir(parents=True, exist_ok=False)
     environment_dir = task_dir / "environment"
     tests_dir = task_dir / "tests"
-    workspace_dir = environment_dir / "workspace"
+    is_daytona = config.environment_type == EnvironmentType.DAYTONA
+    workspace_dir = environment_dir if is_daytona else environment_dir / "workspace"
     tests_dir.mkdir(parents=True)
 
     source = resolve_fixture(pack_path, task)
@@ -240,23 +255,26 @@ def translate_harbor_task(
     (environment_dir / "source-manifest.json").write_text(
         json.dumps({"files": manifest}, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    (environment_dir / "Dockerfile").write_text(
-        f"FROM {PYTHON_BASE_IMAGE}\nCOPY workspace/ /workspace/\nWORKDIR /workspace\n",
-        encoding="utf-8",
-    )
+    policy = config.environment_policy
+    if not is_daytona:
+        (environment_dir / "Dockerfile").write_text(
+            f"FROM {PYTHON_BASE_IMAGE}\nCOPY workspace/ /workspace/\nWORKDIR /workspace\n",
+            encoding="utf-8",
+        )
     baseline_dir = tests_dir / "baseline"
     _copy_candidate_fixture(source, baseline_dir)
     (tests_dir / "capture_workspace.py").write_text(
         _workspace_capture_script(), encoding="utf-8"
     )
-    (tests_dir / "Dockerfile").write_text(
-        f"FROM {PYTHON_BASE_IMAGE}\n"
-        "COPY . /tests/\n"
-        "COPY baseline/ /mogil/before-workspace/\n"
-        "COPY capture_workspace.py /mogil/capture_workspace.py\n"
-        "WORKDIR /artifacts/candidate-workspace\n",
-        encoding="utf-8",
-    )
+    if not is_daytona:
+        (tests_dir / "Dockerfile").write_text(
+            f"FROM {PYTHON_BASE_IMAGE}\n"
+            "COPY . /tests/\n"
+            "COPY baseline/ /mogil/before-workspace/\n"
+            "COPY capture_workspace.py /mogil/capture_workspace.py\n"
+            "WORKDIR /artifacts/candidate-workspace\n",
+            encoding="utf-8",
+        )
     write_verifier_wrapper(task, tests_dir / "verify.py")
     shutil.copyfile(hidden_verifier, tests_dir / "hidden_verify.py", follow_symlinks=False)
     test_script = tests_dir / "test.sh"
@@ -274,10 +292,60 @@ def translate_harbor_task(
         "kwargs": {"test_only": True} if test_agent else {"version": PI_VERSION},
     }
     agent_config["import_path"] = test_agent_import_path or HARBOR_PI_IMPORT_PATH
-    agent_network = "no-network" if test_agent else "public"
-    (task_dir / "task.toml").write_text(
-        _task_toml(task, agent_network=agent_network), encoding="utf-8"
+    if is_daytona and not test_agent:
+        agent_config["kwargs"] = {"version": PI_VERSION, "preinstalled": True}
+    agent_network = (
+        "no-network"
+        if test_agent and not is_daytona
+        else (policy.network_mode.value if policy is not None else "public")
     )
+    allowed_hosts = policy.allowed_hosts if policy is not None else []
+    cpus = policy.cpus if policy is not None else AGENT_CPUS
+    memory_mb = policy.memory_mb if policy is not None else AGENT_MEMORY_MB
+    storage_mb = policy.storage_mb if policy is not None else AGENT_STORAGE_MB
+    image = policy.image if is_daytona and policy is not None else None
+    (task_dir / "task.toml").write_text(
+        _task_toml(
+            task,
+            agent_network=agent_network,
+            allowed_hosts=allowed_hosts,
+            image=image,
+            cpus=cpus,
+            memory_mb=memory_mb,
+            storage_mb=storage_mb,
+            verifier_workdir="/tests" if is_daytona else "/workspace",
+        ),
+        encoding="utf-8",
+    )
+    environment_config: dict[str, object]
+    if is_daytona and policy is not None:
+        environment_config = {
+            "import_path": "mogil_bench.harbor_daytona:MogilDaytonaEnvironment",
+            "delete": True,
+            "mounts": [],
+            "cpu_enforcement_policy": "request",
+            "memory_enforcement_policy": "request",
+            "override_cpus": policy.cpus,
+            "override_memory_mb": policy.memory_mb,
+            "override_storage_mb": policy.storage_mb,
+            "kwargs": {
+                "secrets": {
+                    key: reference.removeprefix("ref:")
+                    for key, reference in policy.secret_refs.items()
+                },
+                "attempt_id": identity.attempt_id,
+                "max_lifetime_minutes": policy.max_lifetime_minutes,
+            },
+        }
+    else:
+        environment_config = {
+            "type": "docker",
+            "delete": True,
+            "mounts": [],
+            "override_cpus": AGENT_CPUS,
+            "override_memory_mb": AGENT_MEMORY_MB,
+            "override_storage_mb": AGENT_STORAGE_MB,
+        }
     return HarborTranslation(
         task_dir=task_dir,
         job_config={
@@ -291,12 +359,5 @@ def translate_harbor_task(
             "retry": {"max_retries": 0},
         },
         agent_config=agent_config,
-        environment_config={
-            "type": "docker",
-            "delete": True,
-            "mounts": [],
-            "override_cpus": AGENT_CPUS,
-            "override_memory_mb": AGENT_MEMORY_MB,
-            "override_storage_mb": AGENT_STORAGE_MB,
-        },
+        environment_config=environment_config,
     )

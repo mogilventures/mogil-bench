@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -63,6 +66,19 @@ class PreflightProbes:
     harbor_version: Callable[[], str] = field(default=lambda: version("harbor"))
     find_executable: Callable[[str], str | None] = shutil.which
     run_command: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] = _run_docker_info
+    daytona_credentials: Callable[[], bool] = field(
+        default=lambda: bool(os.environ.get("DAYTONA_API_KEY"))
+        or bool(
+            os.environ.get("DAYTONA_JWT_TOKEN")
+            and os.environ.get("DAYTONA_ORGANIZATION_ID")
+        )
+    )
+    daytona_importable: Callable[[], bool] = field(
+        default=lambda: __import__("importlib.util").util.find_spec("daytona") is not None
+    )
+    plaintext_secret_present: Callable[[Sequence[str]], bool] = field(
+        default=lambda names: any(os.environ.get(name) for name in names)
+    )
 
 
 def require_harbor(
@@ -86,19 +102,271 @@ def require_harbor(
     return module
 
 
+_DAYTONA_IMPORT_PATH = "mogil_bench.harbor_daytona:MogilDaytonaEnvironment"
+
+
+def _environment_provider(translation: _Translation) -> str | None:
+    environment = translation.environment_config
+    if environment.get("type") == "docker" and environment.get("import_path") is None:
+        return "docker"
+    if environment.get("import_path") == _DAYTONA_IMPORT_PATH and environment.get("type") is None:
+        return "daytona"
+    return None
+
+
+def _canonical_policy(translation: _Translation) -> dict[str, object] | None:
+    provider = _environment_provider(translation)
+    if provider == "docker" and not (translation.task_dir / "task.toml").is_file():
+        from .harbor_tasks import (
+            AGENT_CPUS,
+            AGENT_MEMORY_MB,
+            AGENT_STORAGE_MB,
+            PYTHON_BASE_IMAGE,
+        )
+
+        return {
+            "provider": "docker",
+            "image": PYTHON_BASE_IMAGE,
+            "cpus": AGENT_CPUS,
+            "memory_mb": AGENT_MEMORY_MB,
+            "storage_mb": AGENT_STORAGE_MB,
+            "network_mode": "public",
+            "allowed_hosts": [],
+            "verifier_network_mode": "no-network",
+            "secret_transport": "host_environment",
+            "delete": True,
+            "mounts": [],
+        }
+    try:
+        task = tomllib.loads((translation.task_dir / "task.toml").read_text(encoding="utf-8"))
+        task_environment = task["environment"]
+        verifier_environment = task["verifier"]["environment"]
+        config = translation.environment_config
+        if provider is None:
+            return None
+        image = task_environment.get("docker_image")
+        if provider == "docker":
+            dockerfile = (translation.task_dir / "environment/Dockerfile").read_text(
+                encoding="utf-8"
+            )
+            first_line = dockerfile.splitlines()[0]
+            image = first_line.removeprefix("FROM ")
+        return {
+            "provider": provider,
+            "image": image,
+            "cpus": task_environment["cpus"],
+            "memory_mb": task_environment["memory_mb"],
+            "storage_mb": task_environment["storage_mb"],
+            "network_mode": task_environment["network_mode"],
+            "allowed_hosts": task_environment.get("allowed_hosts", []),
+            "verifier_network_mode": verifier_environment["network_mode"],
+            "secret_transport": (
+                "restricted_reference" if provider == "daytona" else "host_environment"
+            ),
+            "delete": config["delete"],
+            "mounts": config["mounts"],
+        }
+    except (KeyError, OSError, TypeError, tomllib.TOMLDecodeError):
+        return None
+
+
+def _daytona_effective_policy(
+    receipt_dir: Path | None,
+    *,
+    attempt_id: str,
+    requested: dict[str, object] | None,
+    cleanup_receipts: list[dict[str, Any]],
+    expected_sessions: dict[str, str],
+) -> tuple[dict[str, object] | None, dict[str, Path]]:
+    receipt_paths: dict[str, Path] = {}
+    if receipt_dir is None or requested is None:
+        return None, receipt_paths
+    try:
+        receipts: dict[str, tuple[dict[str, object], Path]] = {}
+        for index, path in enumerate(sorted(receipt_dir.glob("*.json"))):
+            receipt_paths[f"unverified-{index}"] = path
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(raw, dict):
+                return None, receipt_paths
+            role = raw.get("role")
+            if role not in {"agent", "verifier"} or role in receipts:
+                return None, receipt_paths
+            receipts[role] = (raw, path)
+        if set(receipts) != {"agent", "verifier"}:
+            return None, receipt_paths
+        requested_cpus = requested.get("cpus")
+        requested_memory_mb = requested.get("memory_mb")
+        requested_storage_mb = requested.get("storage_mb")
+        requested_allowed_hosts = requested.get("allowed_hosts")
+        if (
+            not isinstance(requested_cpus, int)
+            or isinstance(requested_cpus, bool)
+            or not isinstance(requested_memory_mb, int)
+            or isinstance(requested_memory_mb, bool)
+            or not isinstance(requested_storage_mb, int)
+            or isinstance(requested_storage_mb, bool)
+            or not isinstance(requested_allowed_hosts, list)
+            or any(not isinstance(host, str) for host in requested_allowed_hosts)
+        ):
+            return None, receipt_paths
+        effective_by_role: dict[str, dict[str, object]] = {}
+        sandbox_ids: set[str] = set()
+        for role, (receipt, _path) in receipts.items():
+            effective = receipt.get("effective")
+            create_parameters = receipt.get("create_parameters")
+            sandbox_id = receipt.get("sandbox_id")
+            if (
+                set(receipt)
+                != {
+                    "version",
+                    "attempt_id",
+                    "session_id",
+                    "sandbox_id",
+                    "role",
+                    "source",
+                    "effective",
+                    "create_parameters",
+                    "status",
+                    "error",
+                }
+                or receipt.get("version") != "1"
+                or receipt.get("attempt_id") != attempt_id
+                or receipt.get("source") != "daytona_provider_refresh"
+                or receipt.get("status") != "verified"
+                or receipt.get("error") is not None
+                or receipt.get("session_id") != expected_sessions.get(role)
+                or not isinstance(sandbox_id, str)
+                or not sandbox_id
+                or sandbox_id in sandbox_ids
+                or not isinstance(effective, dict)
+                or set(effective)
+                != {
+                    "cpus",
+                    "memory_mb",
+                    "storage_mb",
+                    "network_mode",
+                    "allowed_hosts",
+                    "attempt_label_verified",
+                    "runtime_prerequisites_verified",
+                }
+                or not isinstance(create_parameters, dict)
+                or set(create_parameters) != {"secret_references_attached"}
+                or not isinstance(
+                    create_parameters.get("secret_references_attached"), bool
+                )
+            ):
+                return None, receipt_paths
+            sandbox_ids.add(sandbox_id)
+            cpus = effective.get("cpus")
+            memory_mb = effective.get("memory_mb")
+            storage_mb = effective.get("storage_mb")
+            allowed_hosts = effective.get("allowed_hosts")
+            if (
+                not isinstance(cpus, (int, float))
+                or isinstance(cpus, bool)
+                or not math.isfinite(float(cpus))
+                or cpus <= 0
+                or not isinstance(memory_mb, int)
+                or isinstance(memory_mb, bool)
+                or not isinstance(storage_mb, int)
+                or isinstance(storage_mb, bool)
+                or not isinstance(allowed_hosts, list)
+                or len(allowed_hosts) > 64
+                or any(
+                    not isinstance(host, str) or len(host) > 253
+                    for host in allowed_hosts
+                )
+                or effective.get("attempt_label_verified") is not True
+                or effective.get("runtime_prerequisites_verified") is not True
+                or cpus < requested_cpus
+                or memory_mb < requested_memory_mb
+                or storage_mb < requested_storage_mb
+            ):
+                return None, receipt_paths
+            secrets_attached = create_parameters["secret_references_attached"]
+            if role == "agent":
+                if (
+                    effective.get("network_mode") != requested["network_mode"]
+                    or sorted(allowed_hosts) != sorted(requested_allowed_hosts)
+                    or secrets_attached is not True
+                ):
+                    return None, receipt_paths
+            elif (
+                effective.get("network_mode") != "no-network"
+                or allowed_hosts != []
+                or secrets_attached is not False
+            ):
+                return None, receipt_paths
+            effective_by_role[role] = effective
+        cleanup_ids = {
+            receipt.get("sandbox_id")
+            for receipt in cleanup_receipts
+            if receipt.get("status") == "confirmed"
+        }
+        if cleanup_ids != sandbox_ids:
+            return None, receipt_paths
+        return (
+            {
+                "source": "provider-reported",
+                "agent": effective_by_role["agent"],
+                "verifier": effective_by_role["verifier"],
+            },
+            {role: value[1] for role, value in receipts.items()},
+        )
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+        return None, receipt_paths
+
+
 def _security_invariants(translation: _Translation) -> bool:
     try:
         job = translation.job_config
         environment = translation.environment_config
         retry = job["retry"]
-        return bool(
+        provider = _environment_provider(translation)
+        policy = _canonical_policy(translation)
+        if policy is None:
+            return False
+        common = bool(
             isinstance(retry, dict)
             and job["n_attempts"] == 1
             and job["n_concurrent_trials"] == 1
             and retry["max_retries"] == 0
-            and environment["type"] == "docker"
             and environment["delete"] is True
             and environment["mounts"] == []
+            and policy["verifier_network_mode"] == "no-network"
+        )
+        if not common:
+            return False
+        if provider == "docker":
+            return True
+        raw_kwargs = environment.get("kwargs")
+        kwargs: dict[str, object] = raw_kwargs if isinstance(raw_kwargs, dict) else {}
+        secrets = kwargs.get("secrets")
+        image = policy["image"]
+        return bool(
+            provider == "daytona"
+            and isinstance(image, str)
+            and re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", image)
+            and isinstance(policy["cpus"], int)
+            and policy["cpus"] >= 1
+            and isinstance(policy["memory_mb"], int)
+            and policy["memory_mb"] >= 1024
+            and isinstance(policy["storage_mb"], int)
+            and policy["storage_mb"] >= 4096
+            and policy["network_mode"] == "allowlist"
+            and isinstance(policy["allowed_hosts"], list)
+            and bool(policy["allowed_hosts"])
+            and environment.get("cpu_enforcement_policy") == "request"
+            and environment.get("memory_enforcement_policy") == "request"
+            and environment.get("env", {}) == {}
+            and isinstance(secrets, dict)
+            and bool(secrets)
+            and all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in secrets.items()
+            )
+            and kwargs.get("attempt_id")
+            and isinstance(kwargs.get("max_lifetime_minutes"), int)
         )
     except (AttributeError, KeyError, TypeError):
         return False
@@ -124,19 +392,40 @@ def preflight(
         raise PreflightError(
             f"Mogil Harbor runs require Harbor {HARBOR_VERSION}; installed {installed_harbor}"
         )
-    docker = probes.find_executable("docker")
-    if not docker:
-        raise PreflightError("docker executable not found; install Docker and add it to PATH")
-    result = probes.run_command([docker, "info"])
-    if result.returncode != 0:
-        raise PreflightError(
-            "docker daemon is unreachable; start Docker and verify `docker info` succeeds"
-        )
+    provider = _environment_provider(translation)
+    if provider == "docker":
+        docker = probes.find_executable("docker")
+        if not docker:
+            raise PreflightError("docker executable not found; install Docker and add it to PATH")
+        result = probes.run_command([docker, "info"])
+        if result.returncode != 0:
+            raise PreflightError(
+                "docker daemon is unreachable; start Docker and verify `docker info` succeeds"
+            )
+    elif provider == "daytona":
+        if not probes.daytona_importable():
+            raise PreflightError(
+                "Daytona support is not installed; install mogil-bench[daytona]"
+            )
+        if not probes.daytona_credentials():
+            raise PreflightError(
+                "Daytona credentials unavailable: set DAYTONA_API_KEY or both "
+                "DAYTONA_JWT_TOKEN and DAYTONA_ORGANIZATION_ID"
+            )
+        kwargs = translation.environment_config.get("kwargs")
+        secrets = kwargs.get("secrets") if isinstance(kwargs, dict) else None
+        secret_names = list(secrets) if isinstance(secrets, dict) else []
+        if probes.plaintext_secret_present(secret_names):
+            raise PreflightError(
+                "Daytona rejects plaintext model credentials in the manager environment; "
+                "use only configured organization secret references"
+            )
 
     if not _security_invariants(translation):
         raise PreflightError(
-            "Harbor security invariant failed: Docker only, one attempt, concurrency 1, "
-            "retries 0, delete true, and empty mounts are required"
+            "Harbor security invariant failed: supported provider, one attempt, concurrency 1, "
+            "retries 0, pinned policy, restricted secrets, delete true, and empty "
+            "mounts are required"
         )
 
 
@@ -320,19 +609,72 @@ class HarborBackend:
                 if isinstance(trial_name, str) and trial_name
                 else []
             )
-            project_labels = [_sanitize_project_name(identifier) for identifier in identifiers]
+            provider = _environment_provider(translation)
+            project_labels: list[str] = []
             remaining: list[str] = []
+            receipts: list[dict[str, Any]] = []
             cleanup_error: str | None = None
-            if project_labels:
-                try:
-                    for project_label in project_labels:
-                        remaining.extend(self._docker_inspector(project_label))
-                    cleanup_status = "failed" if remaining else "confirmed"
-                    if remaining:
-                        cleanup_error = "Docker containers remain after Harbor cleanup"
-                except Exception as exception:
+            if provider == "docker":
+                project_labels = [
+                    _sanitize_project_name(identifier) for identifier in identifiers
+                ]
+                if project_labels:
+                    try:
+                        for project_label in project_labels:
+                            remaining.extend(self._docker_inspector(project_label))
+                        cleanup_status = "failed" if remaining else "confirmed"
+                        if remaining:
+                            cleanup_error = "Docker containers remain after Harbor cleanup"
+                    except Exception as exception:
+                        cleanup_status = "unknown"
+                        cleanup_error = str(exception)
+                else:
                     cleanup_status = "unknown"
-                    cleanup_error = str(exception)
+                    cleanup_error = "trial identifiers unavailable for cleanup confirmation"
+            elif provider == "daytona" and job is not None and isinstance(trial_name, str):
+                receipt_dir = job.job_dir / trial_name / "mogil-daytona-cleanup"
+                try:
+                    for path in sorted(receipt_dir.glob("*.json")):
+                        value = json.loads(path.read_text(encoding="utf-8"))
+                        if not isinstance(value, dict):
+                            raise ValueError("cleanup receipt is not an object")
+                        receipts.append(value)
+                    cleanup_sandbox_ids = {
+                        item.get("sandbox_id") for item in receipts
+                    }
+                    valid = (
+                        len(receipts) == 2
+                        and all(
+                            set(item)
+                            == {
+                                "attempt_id",
+                                "session_id",
+                                "sandbox_id",
+                                "status",
+                                "error",
+                            }
+                            for item in receipts
+                        )
+                        and all(item.get("attempt_id") == attempt_id for item in receipts)
+                        and {item.get("session_id") for item in receipts}
+                        == set(identifiers)
+                        and all(item.get("status") == "confirmed" for item in receipts)
+                        and all(item.get("error") is None for item in receipts)
+                        and len(cleanup_sandbox_ids) == 2
+                        and all(
+                            isinstance(sandbox_id, str) and bool(sandbox_id)
+                            for sandbox_id in cleanup_sandbox_ids
+                        )
+                    )
+                    cleanup_status = "confirmed" if valid else "unknown"
+                    if not valid:
+                        cleanup_error = "Daytona deletion confirmation receipts are incomplete"
+                except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exception:
+                    cleanup_status = "unknown"
+                    cleanup_error = (
+                        "Daytona cleanup confirmation failed: "
+                        f"{type(exception).__name__}"
+                    )
             else:
                 cleanup_status = "unknown"
                 cleanup_error = "trial identifiers unavailable for cleanup confirmation"
@@ -341,12 +683,49 @@ class HarborBackend:
                 "started_at": cleanup_started,
                 "ended_at": self._now().isoformat(),
                 "status": cleanup_status,
-                "project_identifiers": identifiers,
-                "compose_project_labels": project_labels,
-                "remaining_container_ids": remaining,
+                "resource_identifiers": identifiers,
+                "remaining_resource_ids": remaining,
                 "error": cleanup_error,
             }
+            if provider == "docker":
+                cleanup.update(
+                    {
+                        "project_identifiers": identifiers,
+                        "compose_project_labels": project_labels,
+                        "remaining_container_ids": remaining,
+                    }
+                )
+            else:
+                cleanup["deletion_receipts"] = receipts
 
+            policy = _canonical_policy(translation)
+            policy_receipt_paths: dict[str, Path] = {}
+            if provider == "docker":
+                effective_policy = policy
+            else:
+                policy_receipt_dir = (
+                    job.job_dir / trial_name / "mogil-daytona-policy"
+                    if job is not None and isinstance(trial_name, str)
+                    else None
+                )
+                effective_policy, policy_receipt_paths = _daytona_effective_policy(
+                    policy_receipt_dir,
+                    attempt_id=attempt_id,
+                    requested=policy,
+                    cleanup_receipts=receipts,
+                    expected_sessions={
+                        "agent": identifiers[0],
+                        "verifier": identifiers[1],
+                    }
+                    if len(identifiers) == 2
+                    else {},
+                )
+            if effective_policy is None:
+                policy_error = (
+                    "provider-reported effective sandbox policy is missing, unverified, "
+                    "or weaker than requested"
+                )
+                error = f"{error}; {policy_error}" if error else policy_error
             agent_outcome, verifier_outcome, infrastructure_outcome = _outcomes(trial)
             if error or cleanup_status != "confirmed":
                 infrastructure_outcome = "failed"
@@ -383,15 +762,14 @@ class HarborBackend:
                         run[destination] = str(value)
 
             _json_file(bundle_dir / "run.json", run)
-            from .harbor_tasks import PYTHON_BASE_IMAGE
-
-            environment = {
-                "type": "docker",
-                "base_image": PYTHON_BASE_IMAGE,
+            environment: dict[str, object] = {
+                "schema_version": "1",
+                "class": "isolated-sandbox",
+                "provider": provider,
                 "delete": True,
                 "mounts": [],
-                "requested": translation.environment_config,
-                "effective": translation.environment_config,
+                "requested": policy,
+                "effective": effective_policy,
             }
             _json_file(bundle_dir / "environment.json", environment)
             _json_file(bundle_dir / "cleanup.json", cleanup)
@@ -417,6 +795,10 @@ class HarborBackend:
                     "workspace/patch.diff": f"{workspace_source}/patch.diff",
                     "workspace/changed-files.json": f"{workspace_source}/changed-files.json",
                 }
+                for role, path in policy_receipt_paths.items():
+                    sources[f"environment/provider-policy-{role}.json"] = str(
+                        path.relative_to(source_root)
+                    )
                 available_sources = {
                     destination: source
                     for destination, source in sources.items()
