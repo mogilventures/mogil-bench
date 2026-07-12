@@ -1,0 +1,9 @@
+{
+  "name": "mogil-bench-daytona-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Locked runtime-only dependency graph for the Mogil Daytona image",
+  "dependencies": {
+    "@mariozechner/pi-coding-agent": "npm:@earendil-works/pi-coding-agent@0.80.6"
+  }
+}
