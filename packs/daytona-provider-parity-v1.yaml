@@ -1,0 +1,77 @@
+version: '1'
+id: daytona-provider-parity-fictional-v1
+revision: '1'
+name: Fictional Daytona Claude provider parity
+# Public synthetic tasks only. The runner executes each matrix cell independently.
+allow_agents: true
+tasks:
+  - id: correct-fictional-calculator
+    category: coding
+    lane: pi-coding
+    privacy_class: public
+    prompt: Fix calculator.py so calculate_total adds the signed adjustment to the fictional subtotal. Keep the public function signature and do not add dependencies.
+    fixture: fixtures/pi-activation/calculator
+    timeout_seconds: 180
+    verifier:
+      argv: [python, /tests/hidden_verify.py, /workspace]
+      timeout_seconds: 30
+      stdout_contains: passed
+  - id: normalize-widget-slugs
+    category: coding
+    lane: pi-coding
+    privacy_class: public
+    prompt: Fix slugify.py so slugify handles mixed case, repeated separators, and surrounding whitespace. Keep the implementation small and dependency-free.
+    fixture: fixtures/pi-activation/slugify
+    timeout_seconds: 180
+    verifier:
+      argv: [python, /tests/hidden_verify.py, /workspace]
+      timeout_seconds: 30
+      stdout_contains: passed
+  - id: summarize-fictional-inventory
+    category: coding
+    lane: pi-coding
+    privacy_class: public
+    prompt: Fix inventory.py so summarize returns deterministic totals by fictional warehouse and rejects negative quantities. Do not add dependencies.
+    fixture: fixtures/pi-activation/inventory
+    timeout_seconds: 180
+    verifier:
+      argv: [python, /tests/hidden_verify.py, /workspace]
+      timeout_seconds: 30
+      stdout_contains: passed
+configurations:
+  - id: anthropic-direct
+    provider: anthropic
+    model: claude-sonnet-4-6
+    adapter: harbor
+    backend: harbor
+    environment_type: daytona
+    environment_policy:
+      image: ghcr.io/mogilventures/mogil-bench-daytona-runtime@sha256:7728671c38220e066d23f63fd2544cc0722874ec40e1c86c883c8cc4d6c35dfe
+      cpus: 2
+      memory_mb: 4096
+      storage_mb: 8192
+      network_mode: allowlist
+      allowed_hosts: [api.anthropic.com]
+      secret_refs:
+        ANTHROPIC_API_KEY: ref:mogil-anthropic-smoke
+      max_lifetime_minutes: 60
+    mounts: []
+    harness: {name: harbor-pi, version: '0.18.0', sdk: pi-0.80.6}
+  - id: openrouter-routed
+    provider: openrouter
+    model: anthropic/claude-sonnet-4.6
+    adapter: harbor
+    backend: harbor
+    environment_type: daytona
+    environment_policy:
+      image: ghcr.io/mogilventures/mogil-bench-daytona-runtime@sha256:7728671c38220e066d23f63fd2544cc0722874ec40e1c86c883c8cc4d6c35dfe
+      cpus: 2
+      memory_mb: 4096
+      storage_mb: 8192
+      network_mode: allowlist
+      allowed_hosts: [openrouter.ai]
+      secret_refs:
+        OPENROUTER_API_KEY: ref:mogil-openrouter-parity
+      max_lifetime_minutes: 60
+    mounts: []
+    harness: {name: harbor-pi, version: '0.18.0', sdk: pi-0.80.6}

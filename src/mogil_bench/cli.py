@@ -78,6 +78,15 @@ def run(
             "--allow-agents", help="Acknowledge execution of pack-approved Pi agent runs."
         ),
     ] = False,
+    attempts: Annotated[
+        int,
+        typer.Option(
+            "--attempts",
+            min=1,
+            max=10,
+            help="Run each Harbor task/configuration cell this many independent times.",
+        ),
+    ] = 1,
 ) -> None:
     """Run every task/configuration pair in PACK_PATH."""
     destination = output_dir or Path("runs") / (
@@ -89,6 +98,7 @@ def run(
             destination,
             allow_commands=allow_commands,
             allow_agents=allow_agents,
+            attempts=attempts,
         )
     except (
         PackError,
@@ -100,6 +110,28 @@ def run(
     ) as error:
         _fail(str(error))
     typer.echo(f"run written to {destination}")
+
+
+@app.command("run-daytona-parity")
+def run_daytona_parity(
+    output_dir: Annotated[Path, typer.Option("--output-dir", "-o")],
+) -> None:
+    """Run the manually authorized, fixed 18-attempt Daytona parity matrix."""
+    try:
+        from .parity import run_live_parity
+
+        run_live_parity(output_dir, runner=run_pack)
+    except (
+        ImportError,
+        PackError,
+        PermissionError,
+        FileExistsError,
+        OSError,
+        ValueError,
+        RuntimeError,
+    ) as error:
+        _fail(str(error))
+    typer.echo(f"parity run written to {output_dir}")
 
 
 @sandbox_app.command("reap-daytona")

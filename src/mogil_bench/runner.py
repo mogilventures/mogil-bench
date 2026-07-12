@@ -15,7 +15,6 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
-from uuid import uuid4
 
 if TYPE_CHECKING:
     from .harbor_backend import HarborAttemptResult
@@ -337,65 +336,83 @@ def _run_pack_to_directory(
     host_pi: Callable[[Path, Task, Configuration, str], Execution] = _pi,
     attempt_id_factory: Callable[[], object] | None = None,
     canary_factory: Callable[[], str] | None = None,
+    attempts: int = 1,
     _test_agent_import_path: str | None = None,
 ) -> Path:
     from .packs import load_pack
 
     pack = load_pack(pack_path)
     fingerprint = pack_fingerprint(pack_path, pack)
+    if not 1 <= attempts <= 10:
+        raise ValueError("attempts must be between 1 and 10")
     if any(config.adapter == "command" for config in pack.configurations) and not allow_commands:
         raise PermissionError("command configurations require --allow-commands acknowledgement")
     agent_configs = [config for config in pack.configurations if config.adapter in {"pi", "harbor"}]
     if agent_configs and not allow_agents:
         raise PermissionError("pi and harbor configurations require --allow-agents acknowledgement")
     harbor_configs = [config for config in pack.configurations if config.adapter == "harbor"]
+    if attempts != 1 and not harbor_configs:
+        raise ValueError("multiple attempts are supported only for Harbor configurations")
     if harbor_configs:
-        if len(harbor_configs) != 1 or len(pack.configurations) != 1:
-            raise ValueError("Harbor runs require exactly one configuration")
+        if len(harbor_configs) != len(pack.configurations):
+            raise ValueError("Harbor runs cannot mix Harbor and non-Harbor configurations")
         from .harbor_backend import HarborBackend, preflight
         from .harbor_tasks import translate_harbor_task
-        from .models import create_attempt_identity
+        from .models import create_attempt_identity, create_numbered_attempt_identity
 
-        config = harbor_configs[0]
         with tempfile.TemporaryDirectory(prefix="mogil-harbor-translation-") as temporary:
             temporary_root = Path(temporary)
-            prepared: list[tuple[Task, str, Any, Any]] = []
-            for task in pack.tasks:
-                result_id = logical_run_id(fingerprint, task, config)
-                identity = create_attempt_identity(
-                    result_id, attempt_id_factory=attempt_id_factory or uuid4
-                )
-                fixture = resolve_fixture(pack_path, task)
-                verifier_template = fixture / "verify.py" if fixture.is_dir() else None
-                if verifier_template is None or not verifier_template.is_file():
-                    raise ValueError(
-                        "Harbor tasks require a hidden verify.py beside the candidate fixture"
-                    )
-                canary = (
-                    canary_factory or (lambda: "HIDDEN_VERIFIER_CANARY_" + secrets.token_hex(16))
-                )()
-                hidden_verifier = temporary_root / f"hidden-{task.id}-verify.py"
-                hidden_verifier.write_text(
-                    verifier_template.read_text(encoding="utf-8").replace("__CANARY__", canary),
-                    encoding="utf-8",
-                )
-                translation = translate_harbor_task(
-                    pack_path,
-                    task,
-                    config,
-                    identity,
-                    temporary_root / "translation",
-                    hidden_verifier=hidden_verifier,
-                    test_agent_import_path=_test_agent_import_path,
-                )
-                (harbor_preflight or preflight)(final_output_dir, translation)
-                prepared.append((task, result_id, identity, translation))
+            prepared: list[tuple[Task, Configuration, str, int, Any, Any]] = []
+            for config in harbor_configs:
+                for task in pack.tasks:
+                    result_id = logical_run_id(fingerprint, task, config)
+                    fixture = resolve_fixture(pack_path, task)
+                    verifier_template = fixture / "verify.py" if fixture.is_dir() else None
+                    if verifier_template is None or not verifier_template.is_file():
+                        raise ValueError(
+                            "Harbor tasks require a hidden verify.py beside the candidate fixture"
+                        )
+                    for attempt_number in range(1, attempts + 1):
+                        identity = (
+                            create_attempt_identity(
+                                result_id, attempt_id_factory=attempt_id_factory
+                            )
+                            if attempt_id_factory is not None
+                            else create_numbered_attempt_identity(result_id, attempt_number)
+                        )
+                        canary = (
+                            canary_factory
+                            or (lambda: "HIDDEN_VERIFIER_CANARY_" + secrets.token_hex(16))
+                        )()
+                        hidden_verifier = (
+                            temporary_root
+                            / f"hidden-{task.id}-{identity.attempt_id}-verify.py"
+                        )
+                        hidden_verifier.write_text(
+                            verifier_template.read_text(encoding="utf-8").replace(
+                                "__CANARY__", canary
+                            ),
+                            encoding="utf-8",
+                        )
+                        translation = translate_harbor_task(
+                            pack_path,
+                            task,
+                            config,
+                            identity,
+                            temporary_root / "translation",
+                            hidden_verifier=hidden_verifier,
+                            test_agent_import_path=_test_agent_import_path,
+                        )
+                        (harbor_preflight or preflight)(final_output_dir, translation)
+                        prepared.append(
+                            (task, config, result_id, attempt_number, identity, translation)
+                        )
 
             output_dir.mkdir(parents=True, exist_ok=False)
             (output_dir / "results").mkdir()
             backend = harbor_backend or HarborBackend()
             summaries: list[dict[str, Any]] = []
-            for task, result_id, identity, translation in prepared:
+            for task, config, result_id, attempt_number, identity, translation in prepared:
                 attempt = asyncio.run(
                     backend.run_attempt(
                         translation,
@@ -441,7 +458,14 @@ def _run_pack_to_directory(
                     run["evidence_status"] = evidence_status.value
                 summaries.append(
                     {
-                        "id": result_id,
+                        "id": (
+                            result_id
+                            if attempts == 1
+                            else f"{result_id}-{identity.attempt_id}"
+                        ),
+                        "logical_run_id": result_id,
+                        "attempt_id": identity.attempt_id,
+                        "attempt_number": attempt_number,
                         "task_id": task.id,
                         "configuration_id": config.id,
                         "category": task.category,
@@ -464,16 +488,26 @@ def _run_pack_to_directory(
                         raise ValueError("generated Harbor evidence must be a JSON object")
                     evidence_values.append(value)
             if evidence_values:
-                (output_dir / "mogil.harbor-evidence.json").write_text(
+                evidence_json = output_dir / "mogil.harbor-evidence.json"
+                evidence_jsonl = output_dir / "mogil.harbor-evidence.jsonl"
+                evidence_json.write_text(
                     json.dumps(evidence_values, indent=2, sort_keys=True) + "\n",
                     encoding="utf-8",
                 )
-                (output_dir / "mogil.harbor-evidence.jsonl").write_text(
+                evidence_jsonl.write_text(
                     "".join(
                         json.dumps(value, sort_keys=True) + "\n" for value in evidence_values
                     ),
                     encoding="utf-8",
                 )
+                from .evidence import validate_evidence_artifact
+
+                expected_evidence = len(evidence_values)
+                if (
+                    validate_evidence_artifact(evidence_json) != expected_evidence
+                    or validate_evidence_artifact(evidence_jsonl) != expected_evidence
+                ):
+                    raise ValueError("generated aggregate Harbor evidence failed validation")
 
             created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
             manifest = {
@@ -637,6 +671,7 @@ def run_pack(
     host_pi: Callable[[Path, Task, Configuration, str], Execution] = _pi,
     attempt_id_factory: Callable[[], object] | None = None,
     canary_factory: Callable[[], str] | None = None,
+    attempts: int = 1,
 ) -> Path:
     """Build a complete run privately and publish it with one atomic rename."""
     return _atomic_run(
@@ -649,4 +684,5 @@ def run_pack(
         host_pi=host_pi,
         attempt_id_factory=attempt_id_factory,
         canary_factory=canary_factory,
+        attempts=attempts,
     )

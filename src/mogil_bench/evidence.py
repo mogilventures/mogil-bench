@@ -556,8 +556,9 @@ def validate_evidence_artifact(path: Path) -> int:
         if not values:
             raise EvidenceError("artifact is empty")
         artifacts = [HarborEvidence.model_validate(value) for value in values]
-        if len({artifact.run.id for artifact in artifacts}) != len(artifacts):
-            raise EvidenceError("artifact contains duplicate run IDs")
+        identities = {(artifact.run.id, artifact.run.attempt) for artifact in artifacts}
+        if len(identities) != len(artifacts):
+            raise EvidenceError("artifact contains duplicate run/attempt identities")
         return len(artifacts)
     except (OSError, UnicodeError, json.JSONDecodeError, ValidationError, ValueError) as error:
         if isinstance(error, EvidenceError):
