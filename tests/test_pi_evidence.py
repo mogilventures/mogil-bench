@@ -237,7 +237,7 @@ def test_pi_0806_parallel_tool_calls_preserve_distinct_ids_and_completion_order(
     assert trajectory.events[-1].kind == "termination"
 
 
-def test_evidence_batch_allows_same_logical_run_with_distinct_attempts(
+def test_evidence_batch_requires_run_ids_and_attempts_to_be_independently_unique(
     tmp_path: Path,
 ) -> None:
     artifact = json.loads(
@@ -248,7 +248,17 @@ def test_evidence_batch_allows_same_logical_run_with_distinct_attempts(
     path = tmp_path / "attempts.json"
     path.write_text(json.dumps([artifact, second]), encoding="utf-8")
 
+    with pytest.raises(EvidenceError, match="duplicate run ids"):
+        validate_evidence_artifact(path)
+
+    second["run"]["id"] = "fictional-run-2"
+    path.write_text(json.dumps([artifact, second]), encoding="utf-8")
     assert validate_evidence_artifact(path) == 2
+
+    second["run"]["attempt"] = artifact["run"]["attempt"]
+    path.write_text(json.dumps([artifact, second]), encoding="utf-8")
+    with pytest.raises(EvidenceError, match="duplicate attempts"):
+        validate_evidence_artifact(path)
 
 
 def test_pi_tool_errors_remain_explicit_and_linked() -> None:

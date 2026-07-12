@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from mogil_bench.artifacts import export_run, validate_artifact
+from mogil_bench.evidence import _replace_evidence_pair, reexport_harbor_evidence
 from mogil_bench.harbor_tasks import write_verifier_wrapper
 from mogil_bench.models import EvidenceStatus, Task
 from mogil_bench.run_bundle import (
@@ -63,6 +64,30 @@ def test_workspace_evidence_tracks_modified_added_deleted_and_modes(tmp_path: Pa
     assert "--- a/deleted.txt" in patch and "-gone" in patch
     assert "+++ b/added.txt" in patch and "+added" in patch
     assert "old mode 100644" in patch and "new mode 100755" in patch
+
+
+def test_workspace_evidence_excludes_generated_python_cache_artifacts(tmp_path: Path) -> None:
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    output = tmp_path / "evidence"
+    before.mkdir()
+    after.mkdir()
+    (before / "inventory.py").write_text("old\n", encoding="utf-8")
+    (after / "inventory.py").write_text("new\n", encoding="utf-8")
+    cache = after / "__pycache__"
+    cache.mkdir()
+    (cache / "inventory.cpython-312.pyc").write_bytes(b"generated")
+    (after / "compiled.pyo").write_bytes(b"generated")
+
+    build_workspace_evidence(before, after, output)
+
+    changed = json.loads((output / "changed-files.json").read_text(encoding="utf-8"))
+    assert changed == [{"path": "inventory.py", "status": "modified"}]
+    patch = (output / "patch.diff").read_text(encoding="utf-8")
+    assert "inventory.py" in patch
+    assert "__pycache__" not in patch and ".pyc" not in patch and ".pyo" not in patch
+    after_manifest = json.loads((output / "after-manifest.json").read_text())
+    assert [item["path"] for item in after_manifest["files"]] == ["inventory.py"]
 
 
 def test_workspace_evidence_is_bounded_and_marks_binary_and_oversized_files(
@@ -483,6 +508,10 @@ def test_real_pi_is_quality_eligible_only_with_complete_canonical_evidence(
     assert run["evidence_status"] == "quality_eligible"
     assert validate_checksums(bundle)
     private_bytes = (bundle / "mogil.harbor-evidence.json").read_bytes()
+    exported = json.loads(private_bytes)
+    assert exported["run"]["attempt"] == "attempt"
+    assert exported["run"]["id"] != "logical"
+    assert exported["analysis_metadata"]["logical_run_id"] == "logical"
     jsonl_bytes = (bundle / "mogil.harbor-evidence.jsonl").read_bytes()
     assert private_bytes != jsonl_bytes
     assert json.loads(private_bytes) == json.loads(jsonl_bytes)
@@ -506,6 +535,156 @@ def test_real_pi_is_quality_eligible_only_with_complete_canonical_evidence(
         analysis_metadata={},
         termination_reason="failed",
     ) == EvidenceStatus.INSUFFICIENT
+
+
+def test_reexport_rebuilds_unique_clean_aggregates_without_changing_bundles(
+    tmp_path: Path,
+) -> None:
+    from test_pi_evidence import _real_pi_stream
+
+    run_dir = tmp_path / "run"
+    results: list[dict[str, object]] = []
+    for index in (1, 2):
+        logical = "logical"
+        attempt = f"attempt-{index}"
+        bundle = complete_bundle(run_dir / f"results/{logical}/{attempt}")
+        run = json.loads((bundle / "run.json").read_text())
+        run["logical_run_id"] = logical
+        run["attempt_id"] = attempt
+        (bundle / "run.json").write_text(json.dumps(run) + "\n", encoding="utf-8")
+        (bundle / "agent/pi.txt").write_bytes(_real_pi_stream())
+        write_checksums(bundle)
+        assert finalize_real_pi_evidence(
+            bundle,
+            task={
+                "id": "task",
+                "revision": "1",
+                "privacy_class": "public",
+                "prompt": "Fix it",
+            },
+            analysis_metadata={"provider": "private", "model": "private"},
+            termination_reason="completed",
+        ) == EvidenceStatus.QUALITY_ELIGIBLE
+        results.append(
+            {
+                "logical_run_id": logical,
+                "attempt_id": attempt,
+                "attempt_number": index,
+                "task_id": "task",
+                "bundle": f"results/{logical}/{attempt}",
+            }
+        )
+
+    first_bundle = run_dir / str(results[0]["bundle"])
+    artifact = json.loads((first_bundle / "mogil.harbor-evidence.json").read_text())
+    artifact["reviewer"]["events"][0]["content"] += "\nexcept ValueError as e:\n"
+    evidence = artifact["reviewer"]["evidence"]
+    evidence["changed_files"].insert(
+        0, {"path": "__pycache__/inventory.cpython-312.pyc", "status": "added"}
+    )
+    evidence["patch"] = (
+        "diff --git a/__pycache__/inventory.cpython-312.pyc "
+        "b/__pycache__/inventory.cpython-312.pyc\n"
+        "new file mode 100644\n"
+        "Binary files a/__pycache__/inventory.cpython-312.pyc and "
+        "b/__pycache__/inventory.cpython-312.pyc differ\n"
+        "diff --git a/inventory.py b/inventory.py\n"
+        "--- a/inventory.py\n+++ b/inventory.py\n+    for row in rows:\n"
+    )
+    canonical = json.dumps(
+        evidence["changed_files"], sort_keys=True, separators=(",", ":")
+    ).encode()
+    evidence["changed_files_reference"]["reviewer_sha256"] = hashlib.sha256(
+        canonical
+    ).hexdigest()
+    evidence["patch_reference"]["reviewer_sha256"] = hashlib.sha256(
+        evidence["patch"].encode()
+    ).hexdigest()
+    for name in ("mogil.harbor-evidence.json", "mogil.harbor-evidence.jsonl"):
+        (first_bundle / name).write_text(json.dumps(artifact) + "\n", encoding="utf-8")
+    write_checksums(first_bundle)
+
+    (run_dir / "manifest.json").write_text(
+        json.dumps({"result_count": 2, "results": results}), encoding="utf-8"
+    )
+    before = {
+        path.relative_to(run_dir).as_posix(): path.read_bytes()
+        for path in run_dir.glob("results/**/*")
+        if path.is_file()
+    }
+
+    json_path, jsonl_path = reexport_harbor_evidence(run_dir)
+
+    values = json.loads(json_path.read_text())
+    assert len(values) == len(jsonl_path.read_text().splitlines()) == 2
+    assert len({value["run"]["id"] for value in values}) == 2
+    assert len({value["run"]["attempt"] for value in values}) == 2
+    assert {value["analysis_metadata"]["logical_run_id"] for value in values} == {
+        "logical"
+    }
+    reviewer = json.dumps([value["reviewer"] for value in values])
+    assert "__pycache__" not in reviewer and ".pyc" not in reviewer
+    assert "rows:\\n" not in reviewer and "as e:\\n" not in reviewer
+    after = {
+        path.relative_to(run_dir).as_posix(): path.read_bytes()
+        for path in run_dir.glob("results/**/*")
+        if path.is_file()
+    }
+    assert after == before
+
+
+@pytest.mark.parametrize("destinations_exist", [False, True])
+def test_aggregate_pair_replacement_rolls_back_when_second_replace_fails(
+    tmp_path: Path, destinations_exist: bool
+) -> None:
+    json_path = tmp_path / "mogil.harbor-evidence.json"
+    jsonl_path = tmp_path / "mogil.harbor-evidence.jsonl"
+    if destinations_exist:
+        json_path.write_bytes(b"old-json")
+        jsonl_path.write_bytes(b"old-jsonl")
+
+    calls = 0
+
+    def fail_second_replace(source: Path, destination: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("injected second replacement failure")
+        os.replace(source, destination)
+
+    with pytest.raises(ValueError, match="replacement failed"):
+        _replace_evidence_pair(
+            tmp_path,
+            b"new-json",
+            b"new-jsonl",
+            replace_file=fail_second_replace,
+        )
+
+    if destinations_exist:
+        assert json_path.read_bytes() == b"old-json"
+        assert jsonl_path.read_bytes() == b"old-jsonl"
+    else:
+        assert not json_path.exists()
+        assert not jsonl_path.exists()
+    assert not list(tmp_path.glob(".*.tmp"))
+
+
+def test_reexport_fails_closed_before_replacing_aggregates(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "manifest.json").write_text(
+        json.dumps({"result_count": 2, "results": []}), encoding="utf-8"
+    )
+    json_path = run_dir / "mogil.harbor-evidence.json"
+    jsonl_path = run_dir / "mogil.harbor-evidence.jsonl"
+    json_path.write_bytes(b"old-json")
+    jsonl_path.write_bytes(b"old-jsonl")
+
+    with pytest.raises(ValueError, match="count"):
+        reexport_harbor_evidence(run_dir)
+
+    assert json_path.read_bytes() == b"old-json"
+    assert jsonl_path.read_bytes() == b"old-jsonl"
 
 
 def test_reward_one_cannot_override_corruption_or_cleanup_failure(tmp_path: Path) -> None:

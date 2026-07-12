@@ -204,7 +204,15 @@ MOGIL_RUN_DAYTONA_PARITY=1 mogil-bench run-daytona-parity \
 
 Do not also export `ANTHROPIC_API_KEY` or `OPENROUTER_API_KEY`; manager preflight rejects plaintext model credentials. There is no host-Pi or mock fallback. An unavailable image, wrong in-image Python/Pi version, policy mismatch, failed attempt, incomplete evidence, or unconfirmed cleanup makes the parity command fail; retries never hide it. The image's existence and in-sandbox Python 3.12, `/bin/sh`, and Pi 0.80.6 checks occur at the real Daytona boundary, so they cannot be claimed by metadata-only validation.
 
-The run root contains aggregate strict evidence with 18 lines plus one bundle per attempt. Validate and dry-run the exact uploads before adding `--confirm`:
+The run root contains aggregate strict evidence with 18 lines plus one bundle per attempt. Each exported `run.id` identifies one actual attempt, while `run.attempt` remains the real attempt ID and private `analysis_metadata.logical_run_id` retains the task/configuration identity for operator reconciliation.
+
+A completed run can be re-exported offline from its retained, checksummed per-attempt bundles. This command does not invoke agents, providers, Daytona, or model APIs, and it does not modify bundle bytes. It validates every bundle and manifest identity, removes generated Python cache evidence, and stages and validates both aggregate files before replacement. Each file replacement uses a same-filesystem atomic rename; if the process observes a replacement failure, it restores both destinations to their prior bytes or prior absence. This is failure-safe rollback, not a crash-atomic multi-file transaction.
+
+```bash
+mogil-bench evidence re-export /tmp/mogil-daytona-provider-parity
+```
+
+Create a **fresh BlindBench project** for a corrected re-export; do not upload it into a project containing rows from an earlier diagnostic import. Validate and dry-run the exact fresh-project uploads before adding `--confirm`:
 
 ```bash
 mogil-bench evidence validate /tmp/mogil-daytona-provider-parity/mogil.harbor-evidence.jsonl
@@ -216,7 +224,7 @@ BLINDBENCH_AUTOMATION_TOKEN='project-token' mogil-bench evidence upload \
   --endpoint https://BLINDBENCH_HOST/ingest/v1/eval-runs --confirm
 ```
 
-The private envelope retains provider/model provenance. Its `reviewer` projection contains the shared task identity, blinded `isolated-sandbox` class, trajectory, objective outcomes, and bounded evidence—but no provider, model, configuration ID, secret name, or secret value—so BlindBench can group same-task attempts without exposing the comparison arm to reviewers.
+The private envelope retains provider/model provenance and stable logical task/configuration identity. Its `reviewer` projection contains the shared task identity, blinded `isolated-sandbox` class, trajectory, objective outcomes, and bounded evidence—but no provider, model, vendor, configuration ID, credential, canary, absolute path, secret name, or secret value—so BlindBench can group same-task attempts without exposing the comparison arm to reviewers.
 
 ## Command safety
 

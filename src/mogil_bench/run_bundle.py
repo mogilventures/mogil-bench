@@ -17,6 +17,7 @@ DEFAULT_MAX_FILE_BYTES = 4 * 1024 * 1024
 DEFAULT_MAX_TOTAL_BYTES = 32 * 1024 * 1024
 DEFAULT_MAX_DIFF_BYTES = 512 * 1024
 HASH_CHUNK_BYTES = 64 * 1024
+_PYTHON_CACHE_SUFFIXES = (".pyc", ".pyo")
 
 
 class BundleError(ValueError):
@@ -43,6 +44,11 @@ def _hash_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _is_generated_python_cache(relative: str) -> bool:
+    path = PurePosixPath(relative)
+    return "__pycache__" in path.parts or path.name.endswith(_PYTHON_CACHE_SUFFIXES)
+
+
 def _bounded_paths(root: Path, max_files: int) -> tuple[list[tuple[str, Path]], bool]:
     found: list[tuple[str, Path]] = []
     pending = [root]
@@ -59,9 +65,11 @@ def _bounded_paths(root: Path, max_files: int) -> tuple[list[tuple[str, Path]], 
                 if item.is_symlink():
                     raise BundleError(f"symlinks are not allowed: {relative}")
                 if item.is_dir(follow_symlinks=False):
-                    pending.append(path)
+                    if not _is_generated_python_cache(relative):
+                        pending.append(path)
                 elif item.is_file(follow_symlinks=False):
-                    found.append((relative, path))
+                    if not _is_generated_python_cache(relative):
+                        found.append((relative, path))
                 else:
                     raise BundleError(f"special files are not allowed: {relative}")
     return sorted(found), False
@@ -524,7 +532,11 @@ def finalize_real_pi_evidence(
     ):
         return EvidenceStatus.INSUFFICIENT
     try:
-        from .evidence import build_harbor_evidence, validate_evidence_artifact
+        from .evidence import (
+            build_harbor_evidence,
+            evidence_run_id,
+            validate_evidence_artifact,
+        )
 
         run_path = bundle_root / "run.json"
         run = _read_object(run_path)
@@ -534,13 +546,15 @@ def finalize_real_pi_evidence(
             "infrastructure": str(run.get("infrastructure_outcome")),
             "evidence_completeness": "complete",
         }
+        logical_run_id = str(run["logical_run_id"])
+        attempt_id = str(run["attempt_id"])
         artifact = build_harbor_evidence(
             bundle_root,
-            run_id=str(run["logical_run_id"]),
-            attempt_id=str(run["attempt_id"]),
+            run_id=evidence_run_id(logical_run_id, attempt_id),
+            attempt_id=attempt_id,
             task=task,
             outcomes=outcomes,
-            analysis_metadata=analysis_metadata,
+            analysis_metadata={**analysis_metadata, "logical_run_id": logical_run_id},
             termination_reason=termination_reason,
         )
         private_path = bundle_root / "mogil.harbor-evidence.json"
