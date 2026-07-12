@@ -85,21 +85,9 @@ def test_real_harbor_docker_fixture_is_complete_and_leak_free(tmp_path: Path) ->
     assert validate_artifact(run_dir / "blindbench.json") == 1
     assert validate_artifact(run_dir / "blindbench.jsonl") == 1
 
-    verifier_only = bundle / "verifier"
-    assert any(
-        canary.encode() in path.read_bytes()
-        for path in verifier_only.rglob("*")
-        if path.is_file()
-    )
-    reviewer_visible_non_verifier = [
-        path
-        for path in run_dir.rglob("*")
-        if path.is_file() and not path.is_relative_to(verifier_only)
-    ]
-    assert reviewer_visible_non_verifier
-    assert all(
-        canary.encode() not in path.read_bytes() for path in reviewer_visible_non_verifier
-    )
+    retained = [path for path in run_dir.rglob("*") if path.is_file()]
+    assert retained
+    assert all(canary.encode() not in path.read_bytes() for path in retained)
 
     assert len(cleanup["compose_project_labels"]) == 2
     assert set(cleanup["compose_project_labels"]).issubset(observed_projects)

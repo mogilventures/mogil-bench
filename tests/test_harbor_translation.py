@@ -104,6 +104,11 @@ def test_translation_builds_harbor_1_3_task_and_pinned_job(tmp_path: Path) -> No
     tests_dockerfile = (translation.task_dir / "tests/Dockerfile").read_text()
     assert "baseline/ /mogil/before-workspace/" in tests_dockerfile
     assert "capture_workspace.py /mogil/capture_workspace.py" in tests_dockerfile
+    verifier_wrapper = (translation.task_dir / "tests/verify.py").read_text(encoding="utf-8")
+    assert "/mogil/capture_workspace.py" in verifier_wrapper
+    assert "/mogil/before-workspace" in verifier_wrapper
+    assert "/tests/capture_workspace.py" not in verifier_wrapper
+    assert "/tests/baseline" not in verifier_wrapper
 
     harbor_job = HarborJobConfig(
         **translation.job_config,

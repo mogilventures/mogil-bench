@@ -147,6 +147,11 @@ def test_daytona_translation_uses_pinned_direct_image_and_restricted_policy(
 
     assert not (translation.task_dir / "environment/Dockerfile").exists()
     assert not (translation.task_dir / "tests/Dockerfile").exists()
+    verifier_wrapper = (translation.task_dir / "tests/verify.py").read_text(encoding="utf-8")
+    assert "/tests/capture_workspace.py" in verifier_wrapper
+    assert "/tests/baseline" in verifier_wrapper
+    assert "/mogil/capture_workspace.py" not in verifier_wrapper
+    assert "/mogil/before-workspace" not in verifier_wrapper
     assert task["environment"] == {
         "build_timeout_sec": 600.0,
         "cpus": 2,
