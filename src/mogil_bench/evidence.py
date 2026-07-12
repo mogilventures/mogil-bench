@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import json
+import os
 import re
+import tempfile
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
@@ -39,10 +42,19 @@ _WORKSPACE_PATH = re.compile(
     r"(?<![A-Za-z0-9_.-])/(?:workspace|artifacts/candidate-workspace)(?:/[A-Za-z0-9_.@+-]+)+"
 )
 _ABSOLUTE_PATH = re.compile(r"(?<![:A-Za-z0-9_.-])/(?!/)(?:[A-Za-z0-9_.@+-]+/)*[A-Za-z0-9_.@+-]+")
+_LINE_ENDING_COLON = re.compile(r"(?<=[A-Za-z]):(?=\r?\n)")
+_PYTHON_CACHE_SUFFIXES = (".pyc", ".pyo")
+_DIFF_HEADER = re.compile(r"^diff --git a/(.+) b/(.+)$")
 
 
 class EvidenceError(ValueError):
     pass
+
+
+def evidence_run_id(logical_run_id: str, attempt_id: str) -> str:
+    """Return a stable BlindBench run identity for one actual attempt."""
+    identity = f"{logical_run_id}\0{attempt_id}".encode()
+    return f"mogil-attempt-{hashlib.sha256(identity).hexdigest()}"
 
 
 def redact_text(value: str) -> str:
@@ -53,7 +65,10 @@ def redact_text(value: str) -> str:
         )
     result = _HOST_PATH.sub("[HOST_PATH]", result)
     result = _WORKSPACE_PATH.sub("[WORKSPACE_PATH]", result)
-    return _ABSOLUTE_PATH.sub("[ABSOLUTE_PATH]", result)
+    result = _ABSOLUTE_PATH.sub("[ABSOLUTE_PATH]", result)
+    # BlindBench scans JSON serialization for Windows paths. A line ending in an
+    # ASCII letter plus ':' serializes as e.g. ``s:\\n`` and trips that check.
+    return _LINE_ENDING_COLON.sub(": ", result)
 
 
 def _redact(value: Any) -> Any:
@@ -467,6 +482,242 @@ def build_harbor_evidence(
     )
 
 
+def _generated_python_cache_path(value: str) -> bool:
+    path = PurePosixPath(value)
+    return "__pycache__" in path.parts or path.name.endswith(_PYTHON_CACHE_SUFFIXES)
+
+
+def _sanitize_reviewer_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return redact_text(value)
+    if isinstance(value, list):
+        return [_sanitize_reviewer_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _sanitize_reviewer_value(item) for key, item in value.items()}
+    return value
+
+
+def _reviewer_safe_patch(value: str) -> str:
+    blocks = re.split(r"(?=^diff --git )", value, flags=re.MULTILINE)
+    retained: list[str] = []
+    for block in blocks:
+        first_line = block.splitlines()[0] if block else ""
+        header = _DIFF_HEADER.fullmatch(first_line)
+        if header and any(_generated_python_cache_path(path) for path in header.groups()):
+            continue
+        retained.append(block)
+    return redact_text("".join(retained))
+
+
+def _bundle_from_manifest(run_dir: Path, reference_value: object) -> Path:
+    if not isinstance(reference_value, str):
+        raise EvidenceError("manifest bundle reference must be a string")
+    reference = Path(reference_value)
+    if reference.is_absolute() or not reference.parts or any(
+        part in {"", ".", ".."} for part in reference.parts
+    ):
+        raise EvidenceError("manifest bundle reference must be a safe relative path")
+    root = run_dir.resolve(strict=True)
+    current = run_dir
+    for part in reference.parts:
+        current /= part
+        if current.is_symlink():
+            raise EvidenceError("manifest bundle path must not contain symlinks")
+    try:
+        bundle = current.resolve(strict=True)
+    except OSError as error:
+        raise EvidenceError("manifest bundle path cannot be resolved") from error
+    if not bundle.is_relative_to(root):
+        raise EvidenceError("manifest bundle path escapes run root")
+    return bundle
+
+
+def _write_staged_file(run_dir: Path, *, prefix: str, data: bytes) -> Path:
+    descriptor, temporary = tempfile.mkstemp(dir=run_dir, prefix=prefix, suffix=".tmp")
+    path = Path(temporary)
+    with os.fdopen(descriptor, "wb") as stream:
+        stream.write(data)
+        stream.flush()
+        os.fsync(stream.fileno())
+    return path
+
+
+def _replace_evidence_pair(
+    run_dir: Path,
+    json_bytes: bytes,
+    jsonl_bytes: bytes,
+    *,
+    replace_file: Callable[[Path, Path], object] = os.replace,
+) -> tuple[Path, Path]:
+    """Replace both files with rollback on observed errors; not crash-atomic as a pair."""
+    destinations = (
+        run_dir / "mogil.harbor-evidence.json",
+        run_dir / "mogil.harbor-evidence.jsonl",
+    )
+    staged: list[Path] = []
+    backups: dict[Path, Path | None] = {}
+    try:
+        for destination, data in zip(destinations, (json_bytes, jsonl_bytes), strict=True):
+            staged.append(
+                _write_staged_file(
+                    run_dir,
+                    prefix=f".{destination.name}.new.",
+                    data=data,
+                )
+            )
+            backups[destination] = (
+                _write_staged_file(
+                    run_dir,
+                    prefix=f".{destination.name}.backup.",
+                    data=destination.read_bytes(),
+                )
+                if destination.exists()
+                else None
+            )
+        try:
+            for staged_path, destination in zip(staged, destinations, strict=True):
+                replace_file(staged_path, destination)
+        except OSError as error:
+            rollback_errors: list[OSError] = []
+            for destination in destinations:
+                backup = backups[destination]
+                try:
+                    if backup is None:
+                        destination.unlink(missing_ok=True)
+                    else:
+                        replace_file(backup, destination)
+                except OSError as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if rollback_errors:
+                raise EvidenceError(
+                    "aggregate replacement failed and prior pair could not be fully restored"
+                ) from error
+            raise EvidenceError(
+                "aggregate replacement failed; prior destination bytes and absence restored"
+            ) from error
+        return destinations
+    finally:
+        for path in (*staged, *(backup for backup in backups.values() if backup is not None)):
+            path.unlink(missing_ok=True)
+
+
+def reexport_harbor_evidence(run_dir: Path) -> tuple[Path, Path]:
+    """Rebuild aggregates with validated staging and rollback on replacement errors."""
+    try:
+        manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise EvidenceError("cannot read re-export manifest") from error
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("results"), list):
+        raise EvidenceError("re-export manifest has an invalid shape")
+    results = manifest["results"]
+    expected = manifest.get("result_count")
+    if not isinstance(expected, int) or isinstance(expected, bool) or expected != len(results):
+        raise EvidenceError("re-export manifest count does not match results")
+    if expected < 1:
+        raise EvidenceError("re-export manifest count must be positive")
+
+    from .run_bundle import validate_checksums
+
+    artifacts: list[HarborEvidence] = []
+    manifest_attempts: set[str] = set()
+    for result in results:
+        if not isinstance(result, dict):
+            raise EvidenceError("re-export manifest result is invalid")
+        logical_run_id = result.get("logical_run_id")
+        attempt_id = result.get("attempt_id")
+        task_id = result.get("task_id")
+        if (
+            not isinstance(logical_run_id, str)
+            or not logical_run_id
+            or not isinstance(attempt_id, str)
+            or not attempt_id
+            or attempt_id in manifest_attempts
+            or not isinstance(task_id, str)
+            or not task_id
+        ):
+            raise EvidenceError("re-export manifest identity is invalid")
+        manifest_attempts.add(attempt_id)
+        bundle = _bundle_from_manifest(run_dir, result.get("bundle"))
+        if not validate_checksums(bundle):
+            raise EvidenceError("retained bundle checksum validation failed")
+        private_path = bundle / "mogil.harbor-evidence.json"
+        if validate_evidence_artifact(private_path) != 1:
+            raise EvidenceError("retained bundle evidence validation failed")
+        try:
+            artifact = HarborEvidence.model_validate_json(
+                private_path.read_text(encoding="utf-8")
+            )
+        except (OSError, UnicodeError, ValidationError) as error:
+            raise EvidenceError("retained bundle evidence is invalid") from error
+        desired_run_id = evidence_run_id(logical_run_id, attempt_id)
+        retained_logical = artifact.analysis_metadata.get("logical_run_id")
+        if (
+            artifact.run.attempt != attempt_id
+            or artifact.run.id not in {logical_run_id, desired_run_id}
+            or (retained_logical is not None and retained_logical != logical_run_id)
+            or artifact.reviewer.task.id != task_id
+        ):
+            raise EvidenceError("retained bundle identity does not match manifest")
+
+        value = artifact.model_dump(mode="json", by_alias=True, exclude_none=True)
+        value["run"]["id"] = desired_run_id
+        value["analysis_metadata"]["logical_run_id"] = logical_run_id
+        value["reviewer"] = _sanitize_reviewer_value(value["reviewer"])
+        reviewer_evidence = value["reviewer"]["evidence"]
+        changed_files = [
+            item
+            for item in reviewer_evidence["changed_files"]
+            if not _generated_python_cache_path(item["path"])
+        ]
+        patch = _reviewer_safe_patch(reviewer_evidence["patch"])
+        reviewer_evidence["changed_files"] = changed_files
+        reviewer_evidence["changed_files_reference"]["reviewer_sha256"] = (
+            _reviewer_sha256(changed_files)
+        )
+        reviewer_evidence["patch"] = patch
+        reviewer_evidence["patch_reference"]["reviewer_sha256"] = _reviewer_sha256(patch)
+        verifier_values = {
+            "verifier/stdout.txt": reviewer_evidence["verifier_stdout"],
+            "verifier/stderr.txt": reviewer_evidence["verifier_stderr"],
+        }
+        for reference in reviewer_evidence["verifier_references"]:
+            reference["reviewer_sha256"] = _reviewer_sha256(
+                verifier_values[reference["path"]]
+            )
+        artifacts.append(HarborEvidence.model_validate(value))
+
+    values = [
+        artifact.model_dump(mode="json", by_alias=True, exclude_none=True)
+        for artifact in artifacts
+    ]
+    if (
+        len(values) != expected
+        or len({artifact.run.id for artifact in artifacts}) != expected
+        or len({artifact.run.attempt for artifact in artifacts}) != expected
+    ):
+        raise EvidenceError("re-export count or identity validation failed")
+    json_bytes = (
+        json.dumps(values, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    ).encode("utf-8")
+    jsonl_bytes = "".join(
+        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        + "\n"
+        for value in values
+    ).encode("utf-8")
+
+    with tempfile.TemporaryDirectory(dir=run_dir, prefix=".evidence-validate-") as temporary:
+        staged_json = Path(temporary) / "mogil.harbor-evidence.json"
+        staged_jsonl = Path(temporary) / "mogil.harbor-evidence.jsonl"
+        staged_json.write_bytes(json_bytes)
+        staged_jsonl.write_bytes(jsonl_bytes)
+        if (
+            validate_evidence_artifact(staged_json) != expected
+            or validate_evidence_artifact(staged_jsonl) != expected
+        ):
+            raise EvidenceError("re-export aggregate validation failed")
+    return _replace_evidence_pair(run_dir, json_bytes, jsonl_bytes)
+
+
 def validate_evidence_endpoint(endpoint: str) -> None:
     parsed = urlparse(endpoint)
     loopback = False
@@ -556,9 +807,12 @@ def validate_evidence_artifact(path: Path) -> int:
         if not values:
             raise EvidenceError("artifact is empty")
         artifacts = [HarborEvidence.model_validate(value) for value in values]
-        identities = {(artifact.run.id, artifact.run.attempt) for artifact in artifacts}
-        if len(identities) != len(artifacts):
-            raise EvidenceError("artifact contains duplicate run/attempt identities")
+        run_ids = {artifact.run.id for artifact in artifacts}
+        attempts = {artifact.run.attempt for artifact in artifacts}
+        if len(run_ids) != len(artifacts):
+            raise EvidenceError("artifact contains duplicate run ids")
+        if len(attempts) != len(artifacts):
+            raise EvidenceError("artifact contains duplicate attempts")
         return len(artifacts)
     except (OSError, UnicodeError, json.JSONDecodeError, ValidationError, ValueError) as error:
         if isinstance(error, EvidenceError):

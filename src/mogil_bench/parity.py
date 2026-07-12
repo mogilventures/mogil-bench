@@ -6,7 +6,12 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
-from .evidence import EvidenceError, HarborEvidence, validate_evidence_artifact
+from .evidence import (
+    EvidenceError,
+    HarborEvidence,
+    evidence_run_id,
+    validate_evidence_artifact,
+)
 from .models import EnvironmentType, Pack
 from .packs import load_pack, pack_fingerprint
 
@@ -244,7 +249,7 @@ def validate_parity_output(
             raise ValueError("parity manifest attempt identity is invalid")
         cells.setdefault(cell, set()).add(number)
         logical_ids.setdefault(cell, set()).add(logical)
-        manifest_attempts[(logical, attempt)] = cell[1]
+        manifest_attempts[(evidence_run_id(logical, attempt), attempt)] = cell[1]
     if set(cells) != expected_cells or any(numbers != {1, 2, 3} for numbers in cells.values()):
         raise ValueError("parity manifest does not contain 3 attempts for every matrix cell")
     stable_logical_ids = {
@@ -254,11 +259,19 @@ def validate_parity_output(
         raise ValueError("parity logical identity is not stable and distinct by matrix cell")
 
     evidence_attempts: dict[tuple[str, str], str] = {}
+    evidence_run_ids: set[str] = set()
+    evidence_attempt_ids: set[str] = set()
     for value in values:
         artifact = HarborEvidence.model_validate(value)
         identity = (artifact.run.id, artifact.run.attempt)
-        if artifact.run.status != "quality_eligible" or identity in evidence_attempts:
-            raise ValueError("parity evidence attempts must be distinct and quality eligible")
+        if (
+            artifact.run.status != "quality_eligible"
+            or artifact.run.id in evidence_run_ids
+            or artifact.run.attempt in evidence_attempt_ids
+        ):
+            raise ValueError("parity evidence run ids and attempts must be independently distinct")
+        evidence_run_ids.add(artifact.run.id)
+        evidence_attempt_ids.add(artifact.run.attempt)
         if _contains_provenance(value.get("reviewer") if isinstance(value, dict) else None):
             raise ValueError("reviewer projection contains provenance")
         evidence_attempts[identity] = artifact.reviewer.task.id

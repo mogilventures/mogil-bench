@@ -11,6 +11,7 @@ import typer
 from .artifacts import ArtifactError, export_run, upload_artifact, validate_artifact
 from .evidence import (
     EvidenceError,
+    reexport_harbor_evidence,
     upload_evidence_artifact,
     validate_evidence_artifact,
 )
@@ -206,6 +207,16 @@ def artifact_upload(
         typer.echo(
             "upload counts: " + ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))
         )
+
+
+@evidence_app.command("re-export")
+def evidence_reexport(run_dir: Path) -> None:
+    """Safely rebuild aggregate evidence from retained validated bundles."""
+    try:
+        json_path, jsonl_path = reexport_harbor_evidence(run_dir)
+    except EvidenceError as error:
+        _fail(str(error))
+    typer.echo(f"wrote {json_path} and {jsonl_path}")
 
 
 @evidence_app.command("validate")

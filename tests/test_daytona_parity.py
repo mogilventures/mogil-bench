@@ -8,6 +8,7 @@ from typer.core import TyperOption
 from typer.main import get_command
 
 from mogil_bench.cli import app
+from mogil_bench.evidence import evidence_run_id
 from mogil_bench.harbor_tasks import translate_harbor_task
 from mogil_bench.models import create_attempt_identity
 from mogil_bench.packs import load_pack
@@ -200,8 +201,9 @@ def test_complete_parity_output_requires_18_blinded_quality_attempts(tmp_path: P
                     }
                 )
                 artifact = json.loads(json.dumps(fixture))
-                artifact["run"]["id"] = logical
+                artifact["run"]["id"] = evidence_run_id(logical, attempt)
                 artifact["run"]["attempt"] = attempt
+                artifact["analysis_metadata"]["logical_run_id"] = logical
                 artifact["reviewer"]["task"]["id"] = task
                 evidence.append(artifact)
     (run_dir / "manifest.json").write_text(
