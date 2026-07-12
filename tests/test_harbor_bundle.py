@@ -208,6 +208,88 @@ def test_verifier_streams_are_independently_bounded_and_rich(tmp_path: Path) -> 
     assert read_reward(logs / "reward.json")["reward"] == 1.0
 
 
+def test_verifier_matches_raw_stdout_but_redacts_canaries_from_retained_streams(
+    tmp_path: Path,
+) -> None:
+    canary = "HIDDEN_VERIFIER_CANARY_deadbeef1234"
+    task = Task.model_validate(
+        {
+            "id": "verify-redaction",
+            "category": "coding",
+            "lane": "pi-coding",
+            "prompt": "x",
+            "verifier": {
+                "argv": [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys; "
+                        f"print('fixture passed {canary}'); "
+                        f"print('diagnostic {canary}', file=sys.stderr)"
+                    ),
+                ],
+                "timeout_seconds": 2,
+                "stdout_contains": f"fixture passed {canary}",
+            },
+        }
+    )
+    wrapper = tmp_path / "verify.py"
+    logs = tmp_path / "logs"
+    write_verifier_wrapper(task, wrapper, trusted_workspace_evidence=False)
+
+    completed = subprocess.run(
+        [sys.executable, str(wrapper)],
+        env={**os.environ, "MOGIL_VERIFIER_LOGS": str(logs)},
+        check=False,
+        capture_output=True,
+    )
+
+    assert completed.returncode == 0
+    verification = json.loads((logs / "verification.json").read_text())
+    assert verification["stdout_assertion_passed"] is True
+    assert (logs / "stdout.txt").read_bytes() == b"fixture passed [REDACTED]\n"
+    assert (logs / "stderr.txt").read_bytes() == b"diagnostic [REDACTED]\n"
+    assert canary.encode() not in (logs / "stdout.txt").read_bytes()
+    assert canary.encode() not in (logs / "stderr.txt").read_bytes()
+
+
+def test_verifier_retains_ordinary_stdout_and_stderr_unchanged(tmp_path: Path) -> None:
+    task = Task.model_validate(
+        {
+            "id": "verify-ordinary-streams",
+            "category": "coding",
+            "lane": "pi-coding",
+            "prompt": "x",
+            "verifier": {
+                "argv": [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys; print('fixture passed'); "
+                        "print('note: 2 + 3 = 5', file=sys.stderr)"
+                    ),
+                ],
+                "timeout_seconds": 2,
+                "stdout_contains": "fixture passed",
+            },
+        }
+    )
+    wrapper = tmp_path / "verify.py"
+    logs = tmp_path / "logs"
+    write_verifier_wrapper(task, wrapper, trusted_workspace_evidence=False)
+
+    completed = subprocess.run(
+        [sys.executable, str(wrapper)],
+        env={**os.environ, "MOGIL_VERIFIER_LOGS": str(logs)},
+        check=False,
+        capture_output=True,
+    )
+
+    assert completed.returncode == 0
+    assert (logs / "stdout.txt").read_bytes() == b"fixture passed\n"
+    assert (logs / "stderr.txt").read_bytes() == b"note: 2 + 3 = 5\n"
+
+
 def test_verifier_timeout_is_recorded_and_malformed_reward_rejected(tmp_path: Path) -> None:
     task = Task.model_validate(
         {

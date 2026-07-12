@@ -54,7 +54,13 @@ def _copy_candidate_fixture(source: Path, destination: Path) -> list[dict[str, s
     return manifest
 
 
-def _verifier_wrapper(task: Task, *, trusted_workspace_evidence: bool = True) -> str:
+def _verifier_wrapper(
+    task: Task,
+    *,
+    trusted_workspace_evidence: bool = True,
+    workspace_capture_script: str = "/mogil/capture_workspace.py",
+    baseline_workspace: str = "/mogil/before-workspace",
+) -> str:
     if task.verifier is None:
         raise ValueError("Harbor coding tasks require a verifier")
     verifier = task.verifier
@@ -63,6 +69,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import time
@@ -110,8 +117,8 @@ try:
         trusted_evidence = logs / "workspace"
         shutil.rmtree(trusted_evidence, ignore_errors=True)
         evidence = subprocess.run(
-            ["/usr/local/bin/python", "/mogil/capture_workspace.py",
-             "/mogil/before-workspace", "/workspace", str(trusted_evidence)],
+            ["/usr/local/bin/python", {workspace_capture_script!r},
+             {baseline_workspace!r}, "/workspace", str(trusted_evidence)],
             capture_output=True,
             check=False,
             timeout={task.verifier.timeout_seconds!r},
@@ -125,8 +132,9 @@ except (OSError, subprocess.TimeoutExpired):
     infrastructure_error = "trusted workspace evidence generation failed"
 passed = passed and infrastructure_error is None
 ended_at = datetime.now(timezone.utc)
-(logs / "stdout.txt").write_bytes(stdout_bytes)
-(logs / "stderr.txt").write_bytes(stderr_bytes)
+canary_pattern = re.compile(rb"\\bHIDDEN_VERIFIER_CANARY_[A-Za-z0-9_-]+")
+(logs / "stdout.txt").write_bytes(canary_pattern.sub(b"[REDACTED]", stdout_bytes))
+(logs / "stderr.txt").write_bytes(canary_pattern.sub(b"[REDACTED]", stderr_bytes))
 (logs / "verification.json").write_text(json.dumps({{
     "started_at": started_at.isoformat(),
     "ended_at": ended_at.isoformat(),
@@ -152,10 +160,20 @@ raise SystemExit(0 if passed else 1)
 
 
 def write_verifier_wrapper(
-    task: Task, path: Path, *, trusted_workspace_evidence: bool = True
+    task: Task,
+    path: Path,
+    *,
+    trusted_workspace_evidence: bool = True,
+    workspace_capture_script: str = "/mogil/capture_workspace.py",
+    baseline_workspace: str = "/mogil/before-workspace",
 ) -> None:
     path.write_text(
-        _verifier_wrapper(task, trusted_workspace_evidence=trusted_workspace_evidence),
+        _verifier_wrapper(
+            task,
+            trusted_workspace_evidence=trusted_workspace_evidence,
+            workspace_capture_script=workspace_capture_script,
+            baseline_workspace=baseline_workspace,
+        ),
         encoding="utf-8",
     )
 
@@ -275,7 +293,14 @@ def translate_harbor_task(
             "WORKDIR /artifacts/candidate-workspace\n",
             encoding="utf-8",
         )
-    write_verifier_wrapper(task, tests_dir / "verify.py")
+    write_verifier_wrapper(
+        task,
+        tests_dir / "verify.py",
+        workspace_capture_script=(
+            "/tests/capture_workspace.py" if is_daytona else "/mogil/capture_workspace.py"
+        ),
+        baseline_workspace="/tests/baseline" if is_daytona else "/mogil/before-workspace",
+    )
     shutil.copyfile(hidden_verifier, tests_dir / "hidden_verify.py", follow_symlinks=False)
     test_script = tests_dir / "test.sh"
     test_script.write_text(
