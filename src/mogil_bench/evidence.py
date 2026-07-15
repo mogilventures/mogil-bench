@@ -24,6 +24,15 @@ from pydantic import (
 )
 
 from .trajectory import CanonicalEvent, TrajectoryError, TrajectoryUsage, parse_pi_jsonl
+from .uploads import (
+    DEFAULT_UPLOAD_TIMEOUT_SECONDS,
+    UploadResponseError,
+    http_error_diagnostic,
+    is_timeout_error,
+    read_json_response,
+    timeout_diagnostic,
+    validate_upload_timeout,
+)
 
 MAX_PATCH_BYTES = 65_536
 MAX_VERIFIER_STREAM_BYTES = 8_192
@@ -764,8 +773,17 @@ def validate_evidence_ingest_counts(payload: Any, expected: int) -> dict[str, in
 
 
 def upload_evidence_artifact(
-    path: Path, endpoint: str, token: str, *, confirm: bool
+    path: Path,
+    endpoint: str,
+    token: str,
+    *,
+    confirm: bool,
+    timeout: float = DEFAULT_UPLOAD_TIMEOUT_SECONDS,
 ) -> dict[str, int] | None:
+    try:
+        validated_timeout = validate_upload_timeout(timeout)
+    except ValueError as error:
+        raise EvidenceError(str(error)) from error
     validate_evidence_endpoint(endpoint)
     expected = validate_evidence_artifact(path)
     if not confirm:
@@ -787,9 +805,20 @@ def upload_evidence_artifact(
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     try:
-        with urlopen(request, timeout=30) as response:  # noqa: S310 - endpoint validated above
-            payload: Any = json.loads(response.read())
-    except (HTTPError, URLError, json.JSONDecodeError, OSError) as error:
+        with urlopen(  # noqa: S310 - endpoint validated above
+            request, timeout=validated_timeout
+        ) as response:
+            payload: Any = read_json_response(response)
+    except HTTPError as error:
+        diagnostic = http_error_diagnostic(error, body=body, token=token)
+        raise EvidenceError(f"evidence upload failed: {diagnostic}") from error
+    except (TimeoutError, URLError) as error:
+        if is_timeout_error(error):
+            raise EvidenceError(timeout_diagnostic("evidence upload")) from error
+        raise EvidenceError(f"evidence upload failed: {type(error).__name__}") from error
+    except UploadResponseError as error:
+        raise EvidenceError(f"evidence upload failed: {error}") from error
+    except OSError as error:
         raise EvidenceError(f"evidence upload failed: {type(error).__name__}") from error
     return validate_evidence_ingest_counts(payload, expected)
 

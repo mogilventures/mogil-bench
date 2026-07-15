@@ -9,6 +9,7 @@ from typing import Annotated
 import typer
 
 from .artifacts import ArtifactError, export_run, upload_artifact, validate_artifact
+from .comparisons import ComparisonExportError, export_paired_comparison
 from .evidence import (
     EvidenceError,
     reexport_harbor_evidence,
@@ -17,6 +18,7 @@ from .evidence import (
 )
 from .packs import PackError, load_pack, pack_fingerprint
 from .runner import run_pack
+from .uploads import DEFAULT_UPLOAD_TIMEOUT_SECONDS
 
 app = typer.Typer(help="Run safe local benchmark packs and emit BlindBench artifacts.")
 pack_app = typer.Typer(help="Inspect and validate benchmark packs.")
@@ -177,6 +179,26 @@ def export_blindbench(run_dir: Path) -> None:
     typer.echo(f"wrote {json_path} and {jsonl_path}")
 
 
+@export_app.command("paired-comparison")
+def export_comparison(
+    run_dir: Path,
+    candidate_a: Annotated[str, typer.Option("--candidate-a")],
+    candidate_b: Annotated[str, typer.Option("--candidate-b")],
+    output_path: Annotated[Path, typer.Option("--output", "-o")],
+) -> None:
+    """Export a completed two-arm run as deterministic BlindBench paired CSV."""
+    try:
+        destination = export_paired_comparison(
+            run_dir,
+            candidate_a=candidate_a,
+            candidate_b=candidate_b,
+            output_path=output_path,
+        )
+    except (ComparisonExportError, OSError) as error:
+        _fail(str(error))
+    typer.echo(f"wrote {destination}")
+
+
 @artifact_app.command("validate")
 def artifact_validate(path: Path) -> None:
     """Validate a BlindBench batch JSON or JSONL artifact."""
@@ -194,11 +216,18 @@ def artifact_upload(
     confirm: Annotated[
         bool, typer.Option("--confirm", help="Perform upload; otherwise dry-run.")
     ] = False,
+    timeout: Annotated[
+        float,
+        typer.Option(
+            "--timeout",
+            help="Request timeout in seconds (finite, positive, maximum 600).",
+        ),
+    ] = DEFAULT_UPLOAD_TIMEOUT_SECONDS,
 ) -> None:
     """Dry-run or explicitly upload a batch to a guarded BlindBench endpoint."""
     token = os.environ.get("BLINDBENCH_INGEST_TOKEN", "")
     try:
-        counts = upload_artifact(path, endpoint, token, confirm=confirm)
+        counts = upload_artifact(path, endpoint, token, confirm=confirm, timeout=timeout)
     except ArtifactError as error:
         _fail(str(error))
     if counts is None:
@@ -234,11 +263,20 @@ def evidence_upload(
     path: Path,
     endpoint: Annotated[str, typer.Option("--endpoint")],
     confirm: Annotated[bool, typer.Option("--confirm")] = False,
+    timeout: Annotated[
+        float,
+        typer.Option(
+            "--timeout",
+            help="Request timeout in seconds (finite, positive, maximum 600).",
+        ),
+    ] = DEFAULT_UPLOAD_TIMEOUT_SECONDS,
 ) -> None:
     """Dry-run or upload evidence using a project Automation token."""
     token = os.environ.get("BLINDBENCH_AUTOMATION_TOKEN", "")
     try:
-        counts = upload_evidence_artifact(path, endpoint, token, confirm=confirm)
+        counts = upload_evidence_artifact(
+            path, endpoint, token, confirm=confirm, timeout=timeout
+        )
     except EvidenceError as error:
         _fail(str(error))
     if counts is None:

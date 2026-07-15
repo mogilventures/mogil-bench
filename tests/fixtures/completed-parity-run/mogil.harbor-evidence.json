@@ -1,0 +1,3152 @@
+[
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-summarize-fictional-inventory",
+      "model": "anthropic/claude-sonnet-4.6",
+      "provider": "openrouter"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 3 for summarize fictional inventory.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "summarize-fictional-inventory",
+        "privacy_class": "public",
+        "prompt": "Implement the fictional inventory summary and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-openrouter-routed-summarize-fictional-inventory-3",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-13e4973addff53892c2b5c7b5d8400e625f577855035efc555de9e99d3620122",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-summarize-fictional-inventory",
+      "model": "anthropic/claude-sonnet-4.6",
+      "provider": "openrouter"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 2 for summarize fictional inventory.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "summarize-fictional-inventory",
+        "privacy_class": "public",
+        "prompt": "Implement the fictional inventory summary and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-openrouter-routed-summarize-fictional-inventory-2",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-9d7fc2b3fa0ec670da9c2b2585dca28c27fd376744f153f50fa92d4bc6f77724",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-summarize-fictional-inventory",
+      "model": "anthropic/claude-sonnet-4.6",
+      "provider": "openrouter"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 1 for summarize fictional inventory.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "summarize-fictional-inventory",
+        "privacy_class": "public",
+        "prompt": "Implement the fictional inventory summary and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-openrouter-routed-summarize-fictional-inventory-1",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-d9be58fa0cfe19d0fd2ca3010e87120642a32f370e870bb95751c9307febe0c6",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-normalize-widget-slugs",
+      "model": "anthropic/claude-sonnet-4.6",
+      "provider": "openrouter"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 3 for normalize widget slugs.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "normalize-widget-slugs",
+        "privacy_class": "public",
+        "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-openrouter-routed-normalize-widget-slugs-3",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-25fddc6d2d6d04f1bb3bfa5c04221deb157a8edd28b3602c17f0fdb7ad35d6cf",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-normalize-widget-slugs",
+      "model": "anthropic/claude-sonnet-4.6",
+      "provider": "openrouter"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 2 for normalize widget slugs.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "normalize-widget-slugs",
+        "privacy_class": "public",
+        "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-openrouter-routed-normalize-widget-slugs-2",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-dacdb85d2a197afd8e4f79ca067fb7121754f50bd4529e86d8093ddc48b40706",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-normalize-widget-slugs",
+      "model": "anthropic/claude-sonnet-4.6",
+      "provider": "openrouter"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 1 for normalize widget slugs.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "normalize-widget-slugs",
+        "privacy_class": "public",
+        "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-openrouter-routed-normalize-widget-slugs-1",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-d5536d2da309484ca82096c6347294d589debda024cf6a15f55378e27085beb3",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-correct-fictional-calculator",
+      "model": "anthropic/claude-sonnet-4.6",
+      "provider": "openrouter"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 3 for correct fictional calculator.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "correct-fictional-calculator",
+        "privacy_class": "public",
+        "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-openrouter-routed-correct-fictional-calculator-3",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-49da5270869df51bb12ba0736d49abbafe42aaac4bbd7600e4451048690ccdb6",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-correct-fictional-calculator",
+      "model": "anthropic/claude-sonnet-4.6",
+      "provider": "openrouter"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 2 for correct fictional calculator.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "correct-fictional-calculator",
+        "privacy_class": "public",
+        "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-openrouter-routed-correct-fictional-calculator-2",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-f432630cf4efc4176c28d3533107d6854e5fe6ffbb5e0a9aaf03b99fc22123e9",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-correct-fictional-calculator",
+      "model": "anthropic/claude-sonnet-4.6",
+      "provider": "openrouter"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 1 for correct fictional calculator.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "correct-fictional-calculator",
+        "privacy_class": "public",
+        "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-openrouter-routed-correct-fictional-calculator-1",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-297fdd4b2571d8e0a90b7ba6034598a7cecd382aa4ada4bb7d9cda847053fba4",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-summarize-fictional-inventory",
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 3 for summarize fictional inventory.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "summarize-fictional-inventory",
+        "privacy_class": "public",
+        "prompt": "Implement the fictional inventory summary and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-anthropic-direct-summarize-fictional-inventory-3",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-c41601e7863fdc88333cb43af4038eb21629d81d15697096046d2d7438b6f8c7",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-summarize-fictional-inventory",
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 2 for summarize fictional inventory.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "summarize-fictional-inventory",
+        "privacy_class": "public",
+        "prompt": "Implement the fictional inventory summary and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-anthropic-direct-summarize-fictional-inventory-2",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-1a05f31996172ec6b47aa700118a175e81fb4c1a146366622d53c9649c2ecb5c",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-summarize-fictional-inventory",
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 1 for summarize fictional inventory.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "summarize-fictional-inventory",
+        "privacy_class": "public",
+        "prompt": "Implement the fictional inventory summary and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-anthropic-direct-summarize-fictional-inventory-1",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-2091ec6e6912a5134bbcae57fb8a011a7b2934378fe2251a008d6b08c750bc4c",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-normalize-widget-slugs",
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 3 for normalize widget slugs.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "normalize-widget-slugs",
+        "privacy_class": "public",
+        "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-anthropic-direct-normalize-widget-slugs-3",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-2419826337c36c859c8cd75eae5188a274b1f75498e698f26ad00d91014f56a9",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-normalize-widget-slugs",
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 2 for normalize widget slugs.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "normalize-widget-slugs",
+        "privacy_class": "public",
+        "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-anthropic-direct-normalize-widget-slugs-2",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-23194d8768ba7473b211163ac23cdff3288aeda95aeafdad47118e1af921e82a",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-normalize-widget-slugs",
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 1 for normalize widget slugs.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "normalize-widget-slugs",
+        "privacy_class": "public",
+        "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-anthropic-direct-normalize-widget-slugs-1",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-fd3df19426fb7e094d711f3165874f0f0f5435bf22b8587b1f5a6ab2a4d9a484",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-correct-fictional-calculator",
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 3 for correct fictional calculator.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "correct-fictional-calculator",
+        "privacy_class": "public",
+        "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-anthropic-direct-correct-fictional-calculator-3",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-b47045172abbc67668cc99c252da56d49ae5164883bda3662d5d4129fc8e943f",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-correct-fictional-calculator",
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 2 for correct fictional calculator.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "correct-fictional-calculator",
+        "privacy_class": "public",
+        "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-anthropic-direct-correct-fictional-calculator-2",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-83e818ef30be15cd40cddaecbf092cfda793ad23d6c6be239d7048eb363bc447",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  },
+  {
+    "analysis_metadata": {
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-correct-fictional-calculator",
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic"
+    },
+    "harness": {
+      "name": "harbor/pi",
+      "schema": "0.18.0"
+    },
+    "outcomes": {
+      "evidence_completeness": "complete",
+      "infrastructure": "succeeded",
+      "process": "succeeded",
+      "verifier": "passed"
+    },
+    "raw": {
+      "path": "agent/pi.txt",
+      "sha256": "04aa4346b7fb1c18e250e8bf6cb58700f821d425ceee2b10667e6d6ea52f6d98"
+    },
+    "reviewer": {
+      "environment_class": "isolated-sandbox",
+      "events": [
+        {
+          "content": "Fix it",
+          "id": "evt-edf7014b929db412d2f2d48610c1d94b",
+          "kind": "user_message",
+          "sequence": 0,
+          "timestamp": "2026-07-11T00:00:01+00:00"
+        },
+        {
+          "content": "inspect",
+          "id": "evt-dc9ac476ec689e9dc183e4a38fc35345",
+          "kind": "assistant_reasoning",
+          "sequence": 1,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "content": "I will edit.",
+          "id": "evt-e42e6a1577f43a9acd465903f1da5122",
+          "kind": "assistant_message",
+          "sequence": 2,
+          "stop_reason": "toolUse",
+          "timestamp": "2026-07-11T00:00:02+00:00"
+        },
+        {
+          "arguments": {
+            "newText": "y",
+            "oldText": "x",
+            "path": "[WORKSPACE_PATH]"
+          },
+          "call_id": "call-1",
+          "id": "evt-f7ade93ebcb71caeca2165ec6dad04b3",
+          "kind": "tool_call",
+          "sequence": 3,
+          "tool_name": "edit"
+        },
+        {
+          "call_id": "call-1",
+          "id": "evt-1975e4fa7b7eb14b7caa95769775ef4a",
+          "kind": "tool_result",
+          "result": {
+            "content": [
+              {
+                "text": "edited [WORKSPACE_PATH]",
+                "type": "text"
+              }
+            ]
+          },
+          "sequence": 4,
+          "tool_name": "edit"
+        },
+        {
+          "content": "Completed attempt 1 for correct fictional calculator.",
+          "id": "evt-801e849f712d9419a74239162701e795",
+          "kind": "final_output",
+          "sequence": 5,
+          "stop_reason": "stop",
+          "timestamp": "2026-07-11T00:00:04+00:00"
+        },
+        {
+          "content": "completed",
+          "id": "evt-a15347c3ae291944e6aaa18fbdd1a801",
+          "kind": "termination",
+          "sequence": 6
+        }
+      ],
+      "evidence": {
+        "changed_files": [
+          {
+            "path": "calculator.py",
+            "status": "modified"
+          }
+        ],
+        "changed_files_reference": {
+          "path": "workspace/changed-files.json",
+          "reviewer_sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0",
+          "sha256": "a261fd8af97a65e61a18809a9811c2f8dd210070c9d1e8219d6853cb487766d0"
+        },
+        "patch": "--- a/calculator.py\n+++ b/calculator.py\n-left - right\n+left + right\n",
+        "patch_reference": {
+          "path": "workspace/patch.diff",
+          "reviewer_sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19",
+          "sha256": "9d7f7d211e9c2fdbcf3c75ef502a3c8b2a00460b96de61b063fb767c101b6b19"
+        },
+        "patch_truncated": false,
+        "verifier_command_summary": "hidden deterministic verifier",
+        "verifier_exit_code": 0,
+        "verifier_references": [
+          {
+            "path": "verifier/stdout.txt",
+            "reviewer_sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e",
+            "sha256": "c421e765f9eba8af20c9a4ec7f3f1ef20c0c25420ccd3b3b097a2b40afb6eb9e"
+          },
+          {
+            "path": "verifier/stderr.txt",
+            "reviewer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "verifier_stderr": "",
+        "verifier_stderr_truncated": false,
+        "verifier_stdout": "fixture passed\n",
+        "verifier_stdout_truncated": false,
+        "verifier_timed_out": false
+      },
+      "harness_schema": "harbor/pi-jsonl@0.18.0",
+      "outcomes": {
+        "evidence_completeness": "complete",
+        "infrastructure": "succeeded",
+        "process": "succeeded",
+        "verifier": "passed"
+      },
+      "rewards": {
+        "command_exit": 1.0,
+        "reward": 1.0,
+        "stdout_assertion": 1.0
+      },
+      "task": {
+        "id": "correct-fictional-calculator",
+        "privacy_class": "public",
+        "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+        "revision": "1"
+      }
+    },
+    "rewards": {
+      "command_exit": 1.0,
+      "reward": 1.0,
+      "stdout_assertion": 1.0
+    },
+    "run": {
+      "attempt": "attempt-anthropic-direct-correct-fictional-calculator-1",
+      "ended_at": "2026-07-11T00:00:03+00:00",
+      "id": "mogil-attempt-1f2f84568554f84483fdea36f0dbb64d561894fc6808a2e1a3a88ff64a817dae",
+      "started_at": "2026-07-11T00:00:00+00:00",
+      "status": "quality_eligible",
+      "termination_reason": "completed"
+    },
+    "schema": "mogil.harbor-evidence",
+    "usage": {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cost_usd": 0.03,
+      "input_tokens": 6,
+      "output_tokens": 4,
+      "total_tokens": 10
+    },
+    "version": "1.0"
+  }
+]

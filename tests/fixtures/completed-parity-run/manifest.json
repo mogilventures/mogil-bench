@@ -1,0 +1,293 @@
+{
+  "result_count": 18,
+  "results": [
+    {
+      "attempt_id": "attempt-openrouter-routed-summarize-fictional-inventory-3",
+      "attempt_number": 3,
+      "configuration_id": "openrouter-routed",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-summarize-fictional-inventory",
+      "model": "anthropic/claude-sonnet-4.6",
+      "privacy_class": "public",
+      "prompt": "Implement the fictional inventory summary and report completion.",
+      "provider": "openrouter",
+      "task_id": "summarize-fictional-inventory"
+    },
+    {
+      "attempt_id": "attempt-openrouter-routed-summarize-fictional-inventory-2",
+      "attempt_number": 2,
+      "configuration_id": "openrouter-routed",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-summarize-fictional-inventory",
+      "model": "anthropic/claude-sonnet-4.6",
+      "privacy_class": "public",
+      "prompt": "Implement the fictional inventory summary and report completion.",
+      "provider": "openrouter",
+      "task_id": "summarize-fictional-inventory"
+    },
+    {
+      "attempt_id": "attempt-openrouter-routed-summarize-fictional-inventory-1",
+      "attempt_number": 1,
+      "configuration_id": "openrouter-routed",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-summarize-fictional-inventory",
+      "model": "anthropic/claude-sonnet-4.6",
+      "privacy_class": "public",
+      "prompt": "Implement the fictional inventory summary and report completion.",
+      "provider": "openrouter",
+      "task_id": "summarize-fictional-inventory"
+    },
+    {
+      "attempt_id": "attempt-openrouter-routed-normalize-widget-slugs-3",
+      "attempt_number": 3,
+      "configuration_id": "openrouter-routed",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-normalize-widget-slugs",
+      "model": "anthropic/claude-sonnet-4.6",
+      "privacy_class": "public",
+      "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+      "provider": "openrouter",
+      "task_id": "normalize-widget-slugs"
+    },
+    {
+      "attempt_id": "attempt-openrouter-routed-normalize-widget-slugs-2",
+      "attempt_number": 2,
+      "configuration_id": "openrouter-routed",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-normalize-widget-slugs",
+      "model": "anthropic/claude-sonnet-4.6",
+      "privacy_class": "public",
+      "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+      "provider": "openrouter",
+      "task_id": "normalize-widget-slugs"
+    },
+    {
+      "attempt_id": "attempt-openrouter-routed-normalize-widget-slugs-1",
+      "attempt_number": 1,
+      "configuration_id": "openrouter-routed",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-normalize-widget-slugs",
+      "model": "anthropic/claude-sonnet-4.6",
+      "privacy_class": "public",
+      "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+      "provider": "openrouter",
+      "task_id": "normalize-widget-slugs"
+    },
+    {
+      "attempt_id": "attempt-openrouter-routed-correct-fictional-calculator-3",
+      "attempt_number": 3,
+      "configuration_id": "openrouter-routed",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-correct-fictional-calculator",
+      "model": "anthropic/claude-sonnet-4.6",
+      "privacy_class": "public",
+      "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+      "provider": "openrouter",
+      "task_id": "correct-fictional-calculator"
+    },
+    {
+      "attempt_id": "attempt-openrouter-routed-correct-fictional-calculator-2",
+      "attempt_number": 2,
+      "configuration_id": "openrouter-routed",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-correct-fictional-calculator",
+      "model": "anthropic/claude-sonnet-4.6",
+      "privacy_class": "public",
+      "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+      "provider": "openrouter",
+      "task_id": "correct-fictional-calculator"
+    },
+    {
+      "attempt_id": "attempt-openrouter-routed-correct-fictional-calculator-1",
+      "attempt_number": 1,
+      "configuration_id": "openrouter-routed",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-openrouter-routed-correct-fictional-calculator",
+      "model": "anthropic/claude-sonnet-4.6",
+      "privacy_class": "public",
+      "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+      "provider": "openrouter",
+      "task_id": "correct-fictional-calculator"
+    },
+    {
+      "attempt_id": "attempt-anthropic-direct-summarize-fictional-inventory-3",
+      "attempt_number": 3,
+      "configuration_id": "anthropic-direct",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-summarize-fictional-inventory",
+      "model": "claude-sonnet-4-6",
+      "privacy_class": "public",
+      "prompt": "Implement the fictional inventory summary and report completion.",
+      "provider": "anthropic",
+      "task_id": "summarize-fictional-inventory"
+    },
+    {
+      "attempt_id": "attempt-anthropic-direct-summarize-fictional-inventory-2",
+      "attempt_number": 2,
+      "configuration_id": "anthropic-direct",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-summarize-fictional-inventory",
+      "model": "claude-sonnet-4-6",
+      "privacy_class": "public",
+      "prompt": "Implement the fictional inventory summary and report completion.",
+      "provider": "anthropic",
+      "task_id": "summarize-fictional-inventory"
+    },
+    {
+      "attempt_id": "attempt-anthropic-direct-summarize-fictional-inventory-1",
+      "attempt_number": 1,
+      "configuration_id": "anthropic-direct",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-summarize-fictional-inventory",
+      "model": "claude-sonnet-4-6",
+      "privacy_class": "public",
+      "prompt": "Implement the fictional inventory summary and report completion.",
+      "provider": "anthropic",
+      "task_id": "summarize-fictional-inventory"
+    },
+    {
+      "attempt_id": "attempt-anthropic-direct-normalize-widget-slugs-3",
+      "attempt_number": 3,
+      "configuration_id": "anthropic-direct",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-normalize-widget-slugs",
+      "model": "claude-sonnet-4-6",
+      "privacy_class": "public",
+      "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+      "provider": "anthropic",
+      "task_id": "normalize-widget-slugs"
+    },
+    {
+      "attempt_id": "attempt-anthropic-direct-normalize-widget-slugs-2",
+      "attempt_number": 2,
+      "configuration_id": "anthropic-direct",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-normalize-widget-slugs",
+      "model": "claude-sonnet-4-6",
+      "privacy_class": "public",
+      "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+      "provider": "anthropic",
+      "task_id": "normalize-widget-slugs"
+    },
+    {
+      "attempt_id": "attempt-anthropic-direct-normalize-widget-slugs-1",
+      "attempt_number": 1,
+      "configuration_id": "anthropic-direct",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-normalize-widget-slugs",
+      "model": "claude-sonnet-4-6",
+      "privacy_class": "public",
+      "prompt": "Normalize fictional widget names into lowercase URL slugs and report completion.",
+      "provider": "anthropic",
+      "task_id": "normalize-widget-slugs"
+    },
+    {
+      "attempt_id": "attempt-anthropic-direct-correct-fictional-calculator-3",
+      "attempt_number": 3,
+      "configuration_id": "anthropic-direct",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-correct-fictional-calculator",
+      "model": "claude-sonnet-4-6",
+      "privacy_class": "public",
+      "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+      "provider": "anthropic",
+      "task_id": "correct-fictional-calculator"
+    },
+    {
+      "attempt_id": "attempt-anthropic-direct-correct-fictional-calculator-2",
+      "attempt_number": 2,
+      "configuration_id": "anthropic-direct",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-correct-fictional-calculator",
+      "model": "claude-sonnet-4-6",
+      "privacy_class": "public",
+      "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+      "provider": "anthropic",
+      "task_id": "correct-fictional-calculator"
+    },
+    {
+      "attempt_id": "attempt-anthropic-direct-correct-fictional-calculator-1",
+      "attempt_number": 1,
+      "configuration_id": "anthropic-direct",
+      "harness": {
+        "name": "harbor-pi",
+        "sdk": "pi-0.80.6",
+        "version": "0.18.0"
+      },
+      "logical_run_id": "logical-anthropic-direct-correct-fictional-calculator",
+      "model": "claude-sonnet-4-6",
+      "privacy_class": "public",
+      "prompt": "Correct the arithmetic operation in the fictional calculator and report completion.",
+      "provider": "anthropic",
+      "task_id": "correct-fictional-calculator"
+    }
+  ]
+}
