@@ -30,6 +30,27 @@ jobs:
           mogil-bench run packs/sample-v1.yaml --output-dir /tmp/mogil-bench-ci
           mogil-bench artifact validate /tmp/mogil-bench-ci/blindbench.json
 
+  distribution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip build
+      - run: python -m build
+      - name: Clean wheel install and credential-free CLI smoke
+        run: |
+          python -m venv /tmp/mogil-wheel-smoke
+          /tmp/mogil-wheel-smoke/bin/python -m pip install dist/*.whl
+          /tmp/mogil-wheel-smoke/bin/mogil-bench --help
+          /tmp/mogil-wheel-smoke/bin/mogil-bench pack validate packs/sample-v1.yaml
+          /tmp/mogil-wheel-smoke/bin/mogil-bench run packs/sample-v1.yaml \
+            --output-dir /tmp/mogil-wheel-sample
+          /tmp/mogil-wheel-smoke/bin/mogil-bench artifact validate \
+            /tmp/mogil-wheel-sample/blindbench.json
+
   docker-smoke:
     runs-on: ubuntu-latest
     steps:

@@ -1,6 +1,19 @@
 # Mogil Bench
 
-Mogil Bench v1 is a local Python CLI for running versioned, real-work-like benchmark packs. It keeps Hermes/text and Pi/coding tasks distinct while exporting both as BlindBench `eval-record` v1 JSON and JSONL for blind human review.
+[![CI](https://github.com/mogilventures/mogil-bench/actions/workflows/ci.yml/badge.svg)](https://github.com/mogilventures/mogil-bench/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Status: public alpha](https://img.shields.io/badge/status-public_alpha-orange.svg)](CHANGELOG.md)
+
+Mogil Bench 0.1.0 is a **public alpha** CLI for reproducible coding-agent evaluation: versioned benchmark packs, Harbor execution, checksummed evidence, reviewer-safe BlindBench exports, and deterministic paired comparisons. Its core execution/evidence path is live-proven, but command and evidence contracts may still change before a stable release.
+
+## Status and boundaries
+
+- Supported: Python 3.12, `harbor==0.18.0`, optional `daytona==0.196.0`, and container Pi `0.80.6`.
+- Credential-free local sample and Docker fixture workflows are continuously tested.
+- Provider execution requires explicit pack and CLI gates; paid Daytona parity remains manually gated.
+- Local Docker is not VM-grade isolation. BlindBench campaign creation, training, PyPI publication, and backend/storage changes are outside this alpha.
+- Never use customer data or secrets in packs. See [`SECURITY.md`](SECURITY.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), and the [release runbook](docs/release.md).
 
 ## Install
 
@@ -212,16 +225,38 @@ A completed run can be re-exported offline from its retained, checksummed per-at
 mogil-bench evidence re-export /tmp/mogil-daytona-provider-parity
 ```
 
-Create a **fresh BlindBench project** for a corrected re-export; do not upload it into a project containing rows from an earlier diagnostic import. Validate and dry-run the exact fresh-project uploads before adding `--confirm`:
+Turn that completed two-arm run into BlindBench's paired-comparison CSV without rerunning a provider. Candidate configuration IDs are selected explicitly on the command line; rows are ordered by immutable task ID and one-based attempt, and only a complete quality-eligible matrix with stable task revisions is accepted. For the shipped 3-task × 2-arm × 3-attempt profile this writes exactly nine cases. Re-exporting the same evidence produces identical bytes, and validation finishes before the destination is replaced.
+
+```bash
+mogil-bench export paired-comparison /tmp/mogil-daytona-provider-parity \
+  --candidate-a anthropic-direct \
+  --candidate-b openrouter-routed \
+  --output /tmp/mogil-daytona-provider-parity/paired-comparison.csv
+```
+
+`context`, `candidate_a`, and `candidate_b` come only from the blinded reviewer projection. The standard `candidate_a_model`, `candidate_b_model`, and harness columns retain owner-visible, provider-qualified route and harness provenance; Mogil emits no ignored custom owner columns and adds no arm labels to reviewer-visible text. Import the CSV through BlindBench's paired-comparison flow; campaign creation remains a manual BlindBench operation.
+
+A credential-free, fixture-backed reproduction of the nine-case contract is available from a repository checkout:
+
+```bash
+mogil-bench export paired-comparison tests/fixtures/completed-parity-run \
+  --candidate-a anthropic-direct \
+  --candidate-b openrouter-routed \
+  --output /tmp/mogil-fixture-comparison.csv
+python -c 'import csv; print(len(list(csv.DictReader(open("/tmp/mogil-fixture-comparison.csv")))))'
+# 9
+```
+
+Create a **fresh BlindBench project** for a corrected re-export; do not upload it into a project containing rows from an earlier diagnostic import. Validate and dry-run the exact fresh-project uploads before adding `--confirm`. The default upload timeout is 120 seconds (bounded to at most 600); set `--timeout 120` explicitly in recorded runbooks:
 
 ```bash
 mogil-bench evidence validate /tmp/mogil-daytona-provider-parity/mogil.harbor-evidence.jsonl
 mogil-bench artifact validate /tmp/mogil-daytona-provider-parity/blindbench.jsonl
 mogil-bench evidence upload /tmp/mogil-daytona-provider-parity/mogil.harbor-evidence.jsonl \
-  --endpoint https://BLINDBENCH_HOST/ingest/v1/eval-runs
+  --endpoint https://BLINDBENCH_HOST/ingest/v1/eval-runs --timeout 120
 BLINDBENCH_AUTOMATION_TOKEN='project-token' mogil-bench evidence upload \
   /tmp/mogil-daytona-provider-parity/mogil.harbor-evidence.jsonl \
-  --endpoint https://BLINDBENCH_HOST/ingest/v1/eval-runs --confirm
+  --endpoint https://BLINDBENCH_HOST/ingest/v1/eval-runs --timeout 120 --confirm
 ```
 
 The private envelope retains provider/model provenance and stable logical task/configuration identity. Its `reviewer` projection contains the shared task identity, blinded `isolated-sandbox` class, trajectory, objective outcomes, and bounded evidence—but no provider, model, vendor, configuration ID, credential, canary, absolute path, secret name, or secret value—so BlindBench can group same-task attempts without exposing the comparison arm to reviewers.
@@ -250,10 +285,10 @@ Upload is dry-run by default and validates both artifact and endpoint without ma
 
 ```bash
 mogil-bench artifact upload /tmp/mogil-sample-run/blindbench.json \
-  --endpoint https://DEPLOYMENT.convex.site/ingest/v1/traces
+  --endpoint https://DEPLOYMENT.convex.site/ingest/v1/traces --timeout 120
 ```
 
-A real upload additionally requires `BLINDBENCH_INGEST_TOKEN` and `--confirm`. Only HTTPS `*.convex.site/ingest/v1/traces` endpoints are accepted. The CLI never prints the token or record content and reports only response counts. It treats `invalid > 0`, `truncated: true`, a malformed counts response, or an imported-plus-deduped count that differs from the intended batch size as an upload failure. Tests make no network calls.
+A real upload additionally requires `BLINDBENCH_INGEST_TOKEN` and `--confirm`. Only HTTPS `*.convex.site/ingest/v1/traces` endpoints are accepted. Both upload paths default to a bounded 120-second timeout suitable for the canonical 18-record batch and accept `--timeout` values only through 600 seconds. A timeout means the outcome is unknown—the server may have completed—so Mogil never retries automatically. Check destination state, then resend the exact artifact if needed; deterministic IDs make that retry idempotent. HTTP errors report only status and a bounded, sanitized diagnostic. The CLI never prints the token or request content and reports only response counts. It treats `invalid > 0`, `truncated: true`, a malformed counts response, or an imported-plus-deduped count that differs from the intended batch size as an upload failure. Tests make no external network calls.
 
 Prompts and outputs are reviewer-visible and free text is not automatically scrubbed by legacy BlindBench exports. Never benchmark secrets or customer data; set `privacy_class` accurately. Hidden verifier expectations are not exported.
 
@@ -270,9 +305,9 @@ Upload is dry-run by default. The public endpoint must be HTTPS (HTTP is accepte
 
 ```bash
 mogil-bench evidence upload EVIDENCE.json \
-  --endpoint https://blindbench.example/ingest/v1/eval-runs
+  --endpoint https://blindbench.example/ingest/v1/eval-runs --timeout 120
 BLINDBENCH_AUTOMATION_TOKEN='project-token' mogil-bench evidence upload EVIDENCE.json \
-  --endpoint https://blindbench.example/ingest/v1/eval-runs --confirm
+  --endpoint https://blindbench.example/ingest/v1/eval-runs --timeout 120 --confirm
 ```
 
 The request body is a bounded batch of complete authoritative Pydantic artifacts, not reviewer projections or legacy trace records:
@@ -301,7 +336,7 @@ A successful consumer response uses exactly these completion counters (additiona
 }
 ```
 
-`complete` must equal the submitted `runs` count, `imported + deduped` must equal that same count, and `invalid` must be zero. A conflict or partial batch must not report a complete count. The token is a project Automation token and is never printed. Errors disclose only exception classes, never token, response body, prompts, or outputs.
+`complete` must equal the submitted `runs` count, `imported + deduped` must equal that same count, and `invalid` must be zero. A conflict or partial batch must not report a complete count. The token is a project Automation token and is never printed. HTTP errors disclose only status and a bounded, sanitized diagnostic—never authorization, request payloads, or unrestricted response bodies.
 
 ## Explicit deferrals
 

@@ -11,6 +11,15 @@ from urllib.request import Request, urlopen
 from pydantic import ValidationError
 
 from .models import BlindBenchBatch, HarborRunRecord
+from .uploads import (
+    DEFAULT_UPLOAD_TIMEOUT_SECONDS,
+    UploadResponseError,
+    http_error_diagnostic,
+    is_timeout_error,
+    read_json_response,
+    timeout_diagnostic,
+    validate_upload_timeout,
+)
 
 
 class ArtifactError(ValueError):
@@ -230,8 +239,17 @@ def validate_ingest_counts(payload: Any, expected_records: int) -> dict[str, Any
 
 
 def upload_artifact(
-    path: Path, endpoint: str, token: str, *, confirm: bool
+    path: Path,
+    endpoint: str,
+    token: str,
+    *,
+    confirm: bool,
+    timeout: float = DEFAULT_UPLOAD_TIMEOUT_SECONDS,
 ) -> dict[str, Any] | None:
+    try:
+        validated_timeout = validate_upload_timeout(timeout)
+    except ValueError as error:
+        raise ArtifactError(str(error)) from error
     validate_endpoint(endpoint)
     expected_records = validate_artifact(path)
     if not confirm:
@@ -252,8 +270,19 @@ def upload_artifact(
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     try:
-        with urlopen(request, timeout=30) as response:  # noqa: S310 - endpoint is strictly validated
-            payload: Any = json.loads(response.read())
-    except (HTTPError, URLError, json.JSONDecodeError) as error:
+        with urlopen(  # noqa: S310 - endpoint is strictly validated
+            request, timeout=validated_timeout
+        ) as response:
+            payload: Any = read_json_response(response)
+    except HTTPError as error:
+        diagnostic = http_error_diagnostic(error, body=body, token=token)
+        raise ArtifactError(f"BlindBench upload failed: {diagnostic}") from error
+    except (TimeoutError, URLError) as error:
+        if is_timeout_error(error):
+            raise ArtifactError(timeout_diagnostic("BlindBench upload")) from error
+        raise ArtifactError(f"BlindBench upload failed: {type(error).__name__}") from error
+    except UploadResponseError as error:
+        raise ArtifactError(f"BlindBench upload failed: {error}") from error
+    except OSError as error:
         raise ArtifactError(f"BlindBench upload failed: {type(error).__name__}") from error
     return validate_ingest_counts(payload, expected_records)

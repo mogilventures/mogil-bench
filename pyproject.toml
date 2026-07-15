@@ -5,10 +5,23 @@ build-backend = "hatchling.build"
 [project]
 name = "mogil-bench"
 version = "0.1.0"
-description = "Safe local benchmark runner and BlindBench artifact exporter"
+description = "Safe Harbor-based coding evaluation and BlindBench evidence CLI"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = {text = "MIT"}
+authors = [{name = "Mogil Ventures"}]
+maintainers = [{name = "Noah Mogil"}]
+keywords = ["benchmark", "coding-agents", "evaluation", "harbor"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed",
+]
 dependencies = [
   "harbor==0.18.0",
   "pydantic>=2.7,<3",
@@ -30,6 +43,12 @@ dev = [
 
 [project.scripts]
 mogil-bench = "mogil_bench.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/mogilventures/mogil-bench"
+Repository = "https://github.com/mogilventures/mogil-bench"
+Issues = "https://github.com/mogilventures/mogil-bench/issues"
+Changelog = "https://github.com/mogilventures/mogil-bench/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mogil_bench"]
